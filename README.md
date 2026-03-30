@@ -132,6 +132,103 @@ dev-bot/
 2. Add a `repo:my-repo` label to the Jira ticket
 3. Run `./init.sh` to clone it
 
+## Running everything
+
+### 1. Memory server + dashboard
+
+The memory server runs as two Docker containers (PostgreSQL + Python app). `init.sh` starts them automatically, but you can also manage them directly:
+
+```bash
+cd memory-server
+
+# Start (builds if needed)
+docker compose up -d --build
+
+# Check logs
+docker compose logs -f memory-server
+
+# Stop
+docker compose down
+
+# Reset database (wipe all data)
+docker compose down -v && docker compose up -d --build
+```
+
+Dashboard is at **http://localhost:8080**. It shows tasks, memories, semantic search, and a 3D embedding map. Live updates via WebSocket — you'll see toast notifications when the bot creates or updates entries.
+
+To seed the database with example data from past work:
+
+```bash
+cd memory-server
+docker compose exec memory-server uv run python seed_from_json.py
+```
+
+### 2. Browser for visual verification
+
+The bot uses chrome-devtools MCP to take screenshots of UI changes. Start a Chromium/Chrome instance with remote debugging enabled:
+
+```bash
+./start-chromium.sh
+```
+
+This launches Chrome on port 9222 with a separate profile (won't interfere with your normal browser). The `.mcp.json` is already configured to connect to it:
+
+```json
+"chrome-devtools": {
+  "command": "npx",
+  "args": ["chrome-devtools-mcp@latest", "--browserUrl", "http://127.0.0.1:9222"]
+}
+```
+
+If you're using Chromium instead of Chrome, edit `start-chromium.sh` and replace `google-chrome` with `chromium` or `chromium-browser`.
+
+### 3. Run the bot
+
+```bash
+# Full init first (clones repos, installs LSP, starts memory server)
+./init.sh
+
+# Start the polling loop
+./run.sh
+```
+
+The bot logs to `bot.log` and stdout. Each cycle it:
+1. Launches Claude CLI with the full tool set (Jira, GitHub, memory, browser, LSP)
+2. Claude reads `CLAUDE.md` and follows the workflow
+3. When the cycle completes, it sleeps for 5 minutes (or 1 hour if no work was found)
+
+To run a single cycle manually (useful for testing):
+
+```bash
+claude --print \
+  --max-turns 100 \
+  --model claude-opus-4-6 \
+  --allowedTools "Edit" "Write" "Read" "Glob" "Grep" "Bash" "LSP" \
+    "mcp__mcp-atlassian__jira_*" \
+    "mcp__chrome-devtools__*" \
+    "mcp__bot-memory__*" \
+  -- "Follow the instructions in CLAUDE.md"
+```
+
+### 4. Configuration
+
+`config.json` controls the bot's behavior:
+
+```json
+{
+  "claude": {
+    "maxTurns": 100,        // Max tool calls per cycle
+    "model": "claude-opus-4-6"
+  },
+  "polling": {
+    "intervalSeconds": 300,     // 5 min between cycles when there's work
+    "idleIntervalSeconds": 3600 // 1 hour when no work is found
+  }
+}
+```
+
+MCP servers are configured in `.mcp.json` (project-level) and `personas/*/mcp.json` (per-persona tools like PatternFly docs).
+
 ## Example
 
 - Jira ticket: [RHCLOUD-46011](https://redhat.atlassian.net/browse/RHCLOUD-46011)
