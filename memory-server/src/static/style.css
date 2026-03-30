@@ -129,7 +129,11 @@ button:hover { opacity: .9; }
 .toast.type-memory_deleted { border-left-color: var(--red); }
 
 /* WS connection indicator */
-.ws-status { width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-left: 8px; transition: background .3s; }
+.ws-status { position: relative; width: 10px; height: 10px; border-radius: 50%; background: var(--red); margin-left: 10px; transition: background .3s; cursor: default; }
+.ws-status::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; }
+.ws-status::after { content: 'Live updates disconnected'; position: absolute; right: 0; top: calc(100% + 8px); background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); padding: 6px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 100; }
+.ws-status:hover::after { opacity: 1; }
 .ws-status.connected { background: var(--green); }
+.ws-status.connected::after { content: 'Live updates connected'; }
 
 @keyframes toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }

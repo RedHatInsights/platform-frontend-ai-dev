@@ -156,6 +156,21 @@ async def api_memory_embeddings(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
+async def api_memory_get(request: Request) -> JSONResponse:
+    """Get a single memory by ID."""
+    pool = get_pool()
+    memory_id = request.path_params.get("id")
+    if not memory_id:
+        return JSONResponse({"error": "missing memory id"}, status_code=400)
+    row = await pool.fetchrow(
+        "SELECT id, category, repo, jira_key, title, content, tags, created_at, metadata FROM memories WHERE id = $1",
+        int(memory_id),
+    )
+    if not row:
+        return JSONResponse({"error": f"Memory {memory_id} not found"}, status_code=404)
+    return JSONResponse(_memory(row))
+
+
 async def api_memory_delete(request: Request) -> JSONResponse:
     """Delete a memory by ID."""
     pool = get_pool()

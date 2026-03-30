@@ -73,6 +73,77 @@ window.closeDetail = function(panelId, splitId) {
   document.querySelectorAll('.memory-card.selected').forEach(c => c.classList.remove('selected'));
 };
 
+// --- Hash routing ---
+// Format: #tab?key=val&key=val  (e.g. #memories?category=learning&repo=insights-chrome&page=2)
+let suppressHashUpdate = false;
+
+function updateHash() {
+  if (suppressHashUpdate) return;
+  const tab = document.querySelector('.tab.active')?.dataset.tab || 'tasks';
+  const params = new URLSearchParams();
+
+  if (tab === 'tasks') {
+    const s = document.getElementById('task-status-filter').value;
+    if (s) params.set('status', s);
+    if (tasksOffset > 0) params.set('page', Math.floor(tasksOffset / TASKS_PER_PAGE) + 1);
+  } else if (tab === 'memories') {
+    const c = document.getElementById('mem-category-filter').value;
+    const r = document.getElementById('mem-repo-filter').value;
+    const t = document.getElementById('mem-tag-filter').value;
+    if (c) params.set('category', c);
+    if (r) params.set('repo', r);
+    if (t) params.set('tag', t);
+    if (memoriesOffset > 0) params.set('page', Math.floor(memoriesOffset / MEMORIES_PER_PAGE) + 1);
+  } else if (tab === 'search') {
+    const q = document.getElementById('search-input').value.trim();
+    if (q) params.set('q', q);
+  }
+
+  const str = params.toString();
+  const hash = '#' + tab + (str ? '?' + str : '');
+  if (location.hash !== hash) history.replaceState(null, '', hash);
+}
+
+function applyHash() {
+  const raw = location.hash.slice(1) || 'tasks';
+  const [tab, qs] = raw.split('?');
+  const params = new URLSearchParams(qs || '');
+
+  suppressHashUpdate = true;
+
+  // Activate tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const tabEl = document.querySelector(`.tab[data-tab="${tab}"]`);
+  if (tabEl) {
+    tabEl.classList.add('active');
+    document.getElementById('panel-' + tab)?.classList.add('active');
+  }
+
+  // Apply filters for the active tab, load defaults for others
+  if (tab === 'tasks') {
+    document.getElementById('task-status-filter').value = params.get('status') || '';
+    tasksOffset = params.has('page') ? (parseInt(params.get('page')) - 1) * TASKS_PER_PAGE : 0;
+  } else if (tab === 'memories') {
+    document.getElementById('mem-category-filter').value = params.get('category') || '';
+    document.getElementById('mem-repo-filter').value = params.get('repo') || '';
+    document.getElementById('mem-tag-filter').value = params.get('tag') || '';
+    memoriesOffset = params.has('page') ? (parseInt(params.get('page')) - 1) * MEMORIES_PER_PAGE : 0;
+  } else if (tab === 'search') {
+    const q = params.get('q') || '';
+    document.getElementById('search-input').value = q;
+    if (q) doSearch();
+  } else if (tab === 'viz') {
+    loadViz();
+  }
+  loadTasks();
+  loadMemories();
+
+  suppressHashUpdate = false;
+}
+
+window.addEventListener('hashchange', applyHash);
+
 // Tabs
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -81,6 +152,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.add('active');
     document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
     if (tab.dataset.tab === 'viz') loadViz();
+    updateHash();
   });
 });
 
@@ -102,12 +174,13 @@ function renderPagination(containerId, total, limit, offset, loadFn) {
   const page = Math.floor(offset / limit) + 1;
   const pages = Math.ceil(total / limit);
   if (pages <= 1) { pag.innerHTML = ''; return; }
+  const key = containerId.replace(/-/g, '_');
   pag.innerHTML = `
-    <button ${page <= 1 ? 'disabled' : ''} onclick="window._pag_${containerId}(${offset - limit})">Prev</button>
+    <button ${page <= 1 ? 'disabled' : ''} onclick="window._pag_${key}(${offset - limit})">Prev</button>
     <span>Page ${page} of ${pages} (${total} total)</span>
-    <button ${page >= pages ? 'disabled' : ''} onclick="window._pag_${containerId}(${offset + limit})">Next</button>
+    <button ${page >= pages ? 'disabled' : ''} onclick="window._pag_${key}(${offset + limit})">Next</button>
   `;
-  window['_pag_' + containerId] = (newOffset) => loadFn(newOffset);
+  window['_pag_' + key] = (newOffset) => { loadFn(newOffset); updateHash(); };
 }
 
 // Tasks
@@ -209,7 +282,7 @@ function showTaskDetail(t) {
   `;
 }
 
-document.getElementById('task-status-filter').addEventListener('change', () => loadTasks(0));
+document.getElementById('task-status-filter').addEventListener('change', () => { loadTasks(0); updateHash(); });
 
 // Memories
 let allMemories = [];
@@ -246,9 +319,9 @@ async function loadFilters() {
   });
 }
 
-document.getElementById('mem-category-filter').addEventListener('change', () => loadMemories(0));
-document.getElementById('mem-repo-filter').addEventListener('change', () => loadMemories(0));
-document.getElementById('mem-tag-filter').addEventListener('change', () => loadMemories(0));
+document.getElementById('mem-category-filter').addEventListener('change', () => { loadMemories(0); updateHash(); });
+document.getElementById('mem-repo-filter').addEventListener('change', () => { loadMemories(0); updateHash(); });
+document.getElementById('mem-tag-filter').addEventListener('change', () => { loadMemories(0); updateHash(); });
 
 // Search
 let searchResults = [];
@@ -258,6 +331,7 @@ async function doSearch() {
   const res = await fetch(API + '/api/memories/search?q=' + encodeURIComponent(q));
   searchResults = await res.json();
   renderMemories(document.getElementById('search-results'), searchResults, true, 'search-detail', 'search-split');
+  updateHash();
 }
 
 document.getElementById('search-btn').addEventListener('click', doSearch);
@@ -423,8 +497,7 @@ async function loadViz() {
       const idx = intersects[0].object.userData.idx;
       const p = vizPoints[idx];
       // Fetch full memory data
-      fetch(API + '/api/memories?limit=200').then(r => r.json()).then(mems => {
-        const full = mems.find(m => m.id === p.id);
+      fetch(API + '/api/memories/' + p.id).then(r => r.json()).then(full => {
         if (full) showDetail('viz-detail', 'viz-split', full);
       });
     }
@@ -563,7 +636,5 @@ function connectWS() {
 
 // Init
 loadStats();
-loadTasks();
-loadMemories();
-loadFilters();
+loadFilters().then(() => applyHash());
 connectWS();
