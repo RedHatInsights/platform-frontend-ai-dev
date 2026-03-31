@@ -67,7 +67,9 @@ def register_task_tools(mcp: FastMCP):
     ) -> dict:
         """Add a new task. Fails if >= 5 active tasks exist.
         title: Jira ticket title. summary: short description of what the bot is doing/did.
-        metadata: structured progress data (e.g. last_step, files_changed)."""
+        metadata: structured progress data (e.g. last_step, files_changed).
+        For multi-repo tickets, include repos list and prs array in metadata:
+        {"repos": ["repo1", "repo2"], "prs": [{"repo": "repo1", "number": 42, "url": "...", "host": "github"}]}"""
         pool = get_pool()
 
         # Check capacity
@@ -108,7 +110,9 @@ def register_task_tools(mcp: FastMCP):
     ) -> dict:
         """Update fields on an existing task.
         summary: human-readable description of current state/what was done.
-        metadata: structured progress data (e.g. last_step, files_changed, commits). Merged with existing metadata."""
+        metadata: structured progress data (e.g. last_step, files_changed, commits, repos, prs). Merged with existing metadata.
+        For multi-repo tickets, use metadata.prs to track all PRs/MRs:
+        {"prs": [{"repo": "repo1", "number": 42, "url": "...", "host": "github"}]}"""
         pool = get_pool()
 
         # Build dynamic SET clause

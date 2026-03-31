@@ -27,6 +27,8 @@ You have access to a memory MCP server (`bot-memory`) that provides:
 Active statuses: `in_progress`, `pr_open`, `pr_changes`.
 Done/paused statuses: `done`, `paused`.
 
+**Multi-repo tickets**: A single task tracks one Jira ticket, even if it spans multiple repos. Use `repo` for the primary repo and store the full list in `metadata.repos`. Store all PRs/MRs in `metadata.prs` as `[{"repo", "number", "url", "host"}]`. The singular `pr_number`/`pr_url` fields hold the primary repo's PR for backward compatibility.
+
 ### Memory MCP Tools
 
 | Tool | Purpose |
@@ -57,8 +59,10 @@ If none of these apply (all tasks are in a clean state with no pending feedback 
 
 For each task with status `pr_open` or `pr_changes`:
 
+A task may have PRs/MRs across multiple repos (check `metadata.prs`). If `metadata.prs` is set, iterate over each PR entry. Otherwise, use the single `repo`/`pr_number`/`pr_url` fields. For each PR/MR:
+
 1. `cd` into the repo directory. Always fetch latest changes first: `git fetch origin`.
-2. Determine whether this is a **GitHub** or **GitLab** repo by checking the `host` field in `project-repos.json`. Use `gh` for GitHub repos and `glab` for GitLab repos throughout.
+2. Determine whether this is a **GitHub** or **GitLab** repo by checking the `host` field in `project-repos.json` (or `metadata.prs[].host`). Use `gh` for GitHub repos and `glab` for GitLab repos throughout.
 3. Get current PR/MR status:
    - **GitHub**: `gh pr view <pr-number> --json state,mergeable,statusCheckRollup,reviewDecision,reviews,url`
    - **GitLab**: `glab mr view <mr-number>`
@@ -100,6 +104,10 @@ For each task with status `pr_open` or `pr_changes`:
 - Use `task_update` to set status to `done` and update `summary` with the final outcome (e.g. "PR merged. Fixed dropdown labels by passing children to PF6 SelectOption.").
 - Use `jira_get_transitions` and `jira_transition_issue` to move the ticket to "Done" (or the appropriate closed status).
 - Update the Jira ticket with a comment noting the PR was merged.
+- **Update linked issues**: Use `jira_get_issue` to check for linked tickets. For each linked ticket:
+  - **Duplicates**: If this ticket was a duplicate of another, comment on the other ticket that the fix has been merged with a link to the PR.
+  - **Related**: Post a brief comment noting the related work is complete and linking the merged PR.
+  - **Blocked tickets**: If other tickets were blocked by this one, comment that the blocker is resolved.
 - Use `memory_store` to save what you learned from the ticket as a `learning` memory.
 
 **If a PR issue cannot be resolved:**
@@ -144,8 +152,6 @@ Only if ALL existing tasks are in a clean state — no pending feedback, no inte
 
 **First, check capacity**: Use `task_check_capacity` to verify you can take on new work. If `has_capacity` is `false`, stop — you're at the 5-task limit.
 
-**Search for relevant memories**: Before starting any new ticket, use `memory_search` with the ticket title/description to find relevant learnings from past work. Apply any insights to your implementation.
-
 Use `jira_search` with this JQL:
 ```
 project = RHCLOUD AND labels = PRIMARY_LABEL AND assignee is EMPTY AND (status != Done) ORDER BY priority DESC, created ASC
@@ -169,6 +175,20 @@ If the ticket has the label `needs-investigation`, do NOT implement anything. In
 6. **Store findings**: Use `memory_store` to save the investigation as a `learning` memory with appropriate tags.
 7. **Remove the `needs-investigation` label** from the ticket and stop. A human will review the findings and decide whether the bot should proceed with implementation.
 
+#### Check linked issues
+
+Before starting work on a ticket, use `jira_get_issue` to read the full ticket including its **issue links**. Check for:
+
+1. **Duplicates**: If the ticket is linked as a duplicate of another ticket (link type "Duplicate"), check the other ticket's status:
+   - If the other ticket is already done or has a merged PR — this ticket may already be resolved. Add a comment noting the duplicate is resolved, transition to Done, and skip.
+   - If the other ticket is in progress (or tracked in your task list) — add a comment noting the duplicate, link the tickets if not already linked, and skip. Do not work on the same thing twice.
+
+2. **Blocked by / Blocks**: If the ticket is blocked by another issue that is not yet resolved, add a comment noting the blocker and stop. Do not start work on blocked tickets.
+
+3. **Related issues**: Note any related tickets. When you open a PR, post a comment on related tickets with a link to the PR so stakeholders on those tickets are aware of the progress.
+
+4. **Parent/Epic**: Note the parent epic if any. When the ticket is done, check if all sibling tickets in the epic are also done — if so, mention it in the completion comment.
+
 #### Implement the ticket
 
 1. **Claim the ticket**: Before starting work, assign the ticket to yourself, transition it to "In Progress", and add it to the current sprint:
@@ -181,11 +201,27 @@ If the ticket has the label `needs-investigation`, do NOT implement anything. In
      - Otherwise → add to the **HCC framework** sprint (board 8070).
      - Use `jira_get_sprints_from_board` with `state="active"` to find the current sprint ID, then `jira_add_issues_to_sprint` to add the ticket.
 
-2. **Track it**: Use `task_add` with `jira_key`, `repo`, `branch` (`bot/<TICKET-KEY>`), status `in_progress`, `title` (the Jira ticket title), `summary` ("Starting work on <title>"), and `metadata` (`{"last_step": "branch_created", "next_step": "implement"}`).
+2. **Track it**: Use `task_add` with `jira_key`, `repo` (the first/primary repo), `branch` (`bot/<TICKET-KEY>`), status `in_progress`, `title` (the Jira ticket title), `summary` ("Starting work on <title>"), and `metadata`. For multi-repo tickets, include all repos in metadata:
+   ```json
+   {"last_step": "branch_created", "next_step": "implement", "repos": ["pdf-generator", "app-interface"]}
+   ```
 
 3. **Get details**: Use `jira_get_issue` to fetch the full ticket (title, description, acceptance criteria).
 
-4. **Search memory**: Use `memory_search` with the ticket description to find relevant past learnings, review feedback, and codebase patterns. Apply any insights.
+4. **Search memory**: Run multiple targeted `memory_search` queries to find relevant past experience. Do not just search once — search from different angles:
+
+   - **By ticket description**: Search with the ticket title and key phrases from the description to find learnings from similar past work.
+   - **By repo**: Search with `repo` filter set to each repo involved. This finds repo-specific patterns like code style, file structure, build quirks, and common pitfalls the bot has learned from previous tickets in that repo.
+   - **By category**:
+     - `category: "review_feedback"` + repo — finds past PR review feedback for this repo (e.g. "reviewers want tests for all utility functions", "always use PF components instead of raw HTML").
+     - `category: "codebase_pattern"` + repo — finds structural patterns (e.g. "components live in src/Components/<Name>/", "API calls go through useChrome()").
+     - `category: "learning"` — finds general lessons from completed tickets.
+   - **By tags**: If the ticket involves a specific area, search with relevant tags (e.g. `tag: "css"`, `tag: "testing"`, `tag: "patternfly"`, `tag: "ci"`, `tag: "dependency-upgrade"`).
+
+   Read through ALL results and apply the insights to your implementation. Pay special attention to:
+   - Review feedback patterns — avoid repeating mistakes that reviewers already caught on past PRs.
+   - Repo-specific conventions — follow the patterns the bot has already learned rather than guessing.
+   - Past solutions to similar problems — reuse approaches that worked before.
 
 5. **Prepare the repos**: Collect all `repo:` labels from the ticket. For each one, match it to `project-repos.json` to find the repo config. Each repo has:
    - `url` — the git clone URL
@@ -283,14 +319,26 @@ If the ticket has the label `needs-investigation`, do NOT implement anything. In
 
    For readonly repos: Do not push or open PRs/MRs. Instead, include the required config changes in the Jira comment so a human can apply them.
 
-11. **Track the PRs**: Use `task_update` to set `status` to `pr_open`, `pr_number`, `pr_url`, `summary` ("PR #N opened, awaiting review"), `metadata` (`{"last_step": "pr_opened", "files_changed": [...], "commits": [...]}`), and `last_addressed` to the current time.
+11. **Track the PRs**: Use `task_update` to set `status` to `pr_open`, `pr_number` and `pr_url` (for the primary repo), `summary`, and `last_addressed` to the current time. For multi-repo tickets, store all PRs/MRs in `metadata.prs`:
+   ```json
+   {
+     "last_step": "pr_opened",
+     "files_changed": [...],
+     "commits": [...],
+     "prs": [
+       {"repo": "pdf-generator", "number": 42, "url": "https://github.com/...", "host": "github"},
+       {"repo": "app-interface", "number": 1234, "url": "https://gitlab.cee.redhat.com/...", "host": "gitlab"}
+     ]
+   }
+   ```
 
 12. **Report on Jira**:
     - Use `jira_get_transitions` and `jira_transition_issue` to move the ticket to "Code Review".
     - Use `jira_add_comment` to post a comment on the ticket with:
       - What you did
-      - A link to the PR
+      - A link to the PR(s)/MR(s)
       - Any issues or concerns
+    - **Update linked issues**: If the ticket has related or duplicate links (from the "Check linked issues" step), post a brief comment on each linked ticket with a link to the PR and a note that work is in progress. This keeps stakeholders on related tickets informed. Do not spam — one comment per linked ticket, only when a PR is first opened or when the ticket is completed.
 
 ## Progress Tracking
 
@@ -305,6 +353,8 @@ Use `task_update` with `summary` and `metadata` at each significant milestone:
   - `commits`: List of commit SHAs pushed
   - `next_step`: What needs to happen next (e.g. `"run_tests"`, `"open_pr"`, `"address_review"`)
   - `notes`: Any context needed for resuming (e.g. `"Lint fails on line 42, needs investigation"`)
+  - `repos`: List of all repos involved (for multi-repo tickets)
+  - `prs`: List of PR/MR objects `{"repo", "number", "url", "host"}` (for multi-repo tickets)
 
 **When to update:**
 
@@ -333,5 +383,10 @@ This is stored in the **task record** (structured data), not in RAG memory. RAG 
 - If you cannot complete the work (missing info, blocked, ambiguous), comment on the Jira ticket explaining why and stop.
 - Do not make changes outside the scope of the ticket.
 - **Do not spam Jira comments.** Before posting a comment on a Jira ticket, always read the existing comments first using `jira_get_issue` (which includes comments). If your last comment already says the same thing (e.g. "PR is open, awaiting review", "CI checks passing"), do NOT post another one. Only comment when there is genuinely new information to share — a new PR, a fix you pushed, a status change, or a blocker. Repeating the same update across cycles is noise.
-- **Store learnings.** After completing a ticket or receiving notable PR feedback, use `memory_store` to save the insight. This builds up the knowledge base for future work.
-- **Search before starting.** Before implementing a new ticket, always `memory_search` for relevant past experience. This avoids repeating mistakes and leverages what the bot has already learned.
+- **Store learnings.** After completing a ticket or receiving notable PR feedback, use `memory_store` to save the insight. Be specific with categorization and tagging so future searches find it:
+  - Use `category: "learning"` for general lessons (e.g. "this API requires X header", "tests must be co-located").
+  - Use `category: "review_feedback"` for patterns from PR reviews (e.g. "reviewer wants exhaustive switch cases", "always destructure props").
+  - Use `category: "codebase_pattern"` for repo structure/convention discoveries (e.g. "components in src/Components/<Name>/", "all API calls go through useChrome()").
+  - Always set `repo` so repo-specific searches find it.
+  - Use relevant `tags` — e.g. `css`, `testing`, `patternfly`, `ci`, `dependency-upgrade`, `bug-fix`, `ui-change`.
+- **Search before starting.** Before implementing a new ticket, run multiple targeted `memory_search` queries (see step 4). This avoids repeating mistakes and leverages what the bot has already learned.

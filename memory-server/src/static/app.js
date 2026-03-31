@@ -206,8 +206,8 @@ async function loadTasks(offset) {
       </div>
       ${t.title ? `<div class="task-title">${esc(t.title)}</div>` : ''}
       <div class="task-meta">
-        ${t.repo ? `<span>repo: ${t.repo}</span>` : ''}
-        ${t.pr_url ? `<span>PR #${t.pr_number}</span>` : t.pr_number ? `<span>PR #${t.pr_number}</span>` : ''}
+        ${t.metadata && t.metadata.repos ? `<span>repos: ${t.metadata.repos.join(', ')}</span>` : t.repo ? `<span>repo: ${t.repo}</span>` : ''}
+        ${t.metadata && t.metadata.prs ? t.metadata.prs.map(p => `<span>PR #${p.number} (${p.repo})</span>`).join('') : t.pr_url ? `<span>PR #${t.pr_number}</span>` : t.pr_number ? `<span>PR #${t.pr_number}</span>` : ''}
         <span>created: ${new Date(t.created_at).toLocaleDateString()}</span>
         <span>last: ${timeAgo(t.last_addressed)}</span>
       </div>
@@ -246,9 +246,13 @@ function showTaskDetail(t) {
           <span class="detail-meta-label">Status</span>
           <span class="badge badge-${t.status}">${t.status.replace('_', ' ')}</span>
         </div>
-        ${t.repo ? `<div class="detail-meta-row"><span class="detail-meta-label">Repo</span><span>${t.repo}</span></div>` : ''}
+        ${t.metadata && t.metadata.repos
+          ? `<div class="detail-meta-row"><span class="detail-meta-label">Repos</span><span>${t.metadata.repos.join(', ')}</span></div>`
+          : t.repo ? `<div class="detail-meta-row"><span class="detail-meta-label">Repo</span><span>${t.repo}</span></div>` : ''}
         ${t.branch ? `<div class="detail-meta-row"><span class="detail-meta-label">Branch</span><span style="font-family:monospace;font-size:12px">${t.branch}</span></div>` : ''}
-        ${t.pr_url ? `<div class="detail-meta-row"><span class="detail-meta-label">PR</span><a href="${t.pr_url}" target="_blank">${t.pr_url.replace('https://github.com/', '')}</a></div>` : t.pr_number ? `<div class="detail-meta-row"><span class="detail-meta-label">PR</span><span>#${t.pr_number}</span></div>` : ''}
+        ${t.metadata && t.metadata.prs
+          ? t.metadata.prs.map(p => `<div class="detail-meta-row"><span class="detail-meta-label">${p.host === 'gitlab' ? 'MR' : 'PR'} (${p.repo})</span><a href="${p.url}" target="_blank">#${p.number}</a></div>`).join('')
+          : t.pr_url ? `<div class="detail-meta-row"><span class="detail-meta-label">PR</span><a href="${t.pr_url}" target="_blank">${t.pr_url.replace('https://github.com/', '')}</a></div>` : t.pr_number ? `<div class="detail-meta-row"><span class="detail-meta-label">PR</span><span>#${t.pr_number}</span></div>` : ''}
         <div class="detail-meta-row"><span class="detail-meta-label">Created</span><span>${new Date(t.created_at).toLocaleDateString()} (${timeAgo(t.created_at)})</span></div>
         <div class="detail-meta-row"><span class="detail-meta-label">Last active</span><span>${new Date(t.last_addressed).toLocaleDateString()} (${timeAgo(t.last_addressed)})</span></div>
       </div>
