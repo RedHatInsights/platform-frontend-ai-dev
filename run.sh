@@ -81,6 +81,38 @@ while true; do
     log "Agent run failed"
   }
 
+  # Extract cost data from stream-json result and append to costs.jsonl
+  RESULT_LINE=$(echo "$OUTPUT" | grep '"type":"result"' | tail -1)
+  if [ -n "$RESULT_LINE" ]; then
+    COST_ENTRY=$(echo "$RESULT_LINE" | python3 -c "
+import json, sys
+from datetime import datetime, timezone
+r = json.loads(sys.stdin.readline())
+u = r.get('usage', {})
+m = r.get('modelUsage', {})
+model_info = next(iter(m.values()), {})
+entry = {
+    'timestamp': datetime.now(timezone.utc).isoformat(),
+    'label': '${PRIMARY_LABEL}',
+    'session_id': r.get('session_id', ''),
+    'num_turns': r.get('num_turns', 0),
+    'duration_ms': r.get('duration_ms', 0),
+    'cost_usd': r.get('total_cost_usd', 0),
+    'input_tokens': u.get('input_tokens', 0),
+    'output_tokens': u.get('output_tokens', 0),
+    'cache_read_tokens': u.get('cache_read_input_tokens', 0),
+    'cache_write_tokens': u.get('cache_creation_input_tokens', 0),
+    'model': next(iter(m.keys()), ''),
+    'is_error': r.get('is_error', False),
+    'no_work': 'NO_WORK_FOUND' in r.get('result', ''),
+}
+print(json.dumps(entry))
+" 2>/dev/null)
+    if [ -n "$COST_ENTRY" ]; then
+      echo "$COST_ENTRY" >> "$SCRIPT_DIR/costs.jsonl"
+    fi
+  fi
+
   # Check if there was no work found — use longer idle interval
   if echo "$OUTPUT" | grep -q "NO_WORK_FOUND"; then
     log "No work found. Sleeping for ${IDLE_INTERVAL}s..."

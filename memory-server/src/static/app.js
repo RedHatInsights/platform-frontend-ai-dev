@@ -582,6 +582,63 @@ function timeAgo(iso) {
   return Math.floor(s/86400) + 'd ago';
 }
 
+// ---- Bot status banner ----
+let _bannerStatus = null;
+
+function updateBanner(status) {
+  _bannerStatus = status;
+  const banner = document.getElementById('bot-banner');
+  const stateEl = document.getElementById('bot-banner-state');
+  const msgEl = document.getElementById('bot-banner-msg');
+
+  banner.className = 'bot-banner state-' + (status.state || 'idle');
+  stateEl.textContent = status.state || 'idle';
+
+  // Animate message change
+  msgEl.style.animation = 'none';
+  msgEl.offsetHeight; // trigger reflow
+  msgEl.style.animation = '';
+  msgEl.textContent = status.message || 'Waiting for next cycle...';
+
+  renderBannerMeta();
+}
+
+function renderBannerMeta() {
+  const status = _bannerStatus;
+  if (!status) return;
+  const metaEl = document.getElementById('bot-banner-meta');
+
+  let meta = [];
+  if (status.jira_key) {
+    meta.push(`<a href="https://redhat.atlassian.net/browse/${status.jira_key}" target="_blank">${status.jira_key}</a>`);
+  }
+  if (status.repo) {
+    meta.push(status.repo);
+  }
+  if (status.state === 'working' && status.cycle_start) {
+    const elapsed = Math.floor((Date.now() - new Date(status.cycle_start).getTime()) / 1000);
+    const min = Math.floor(elapsed / 60);
+    const sec = elapsed % 60;
+    meta.push(`<span class="bot-banner-timer">${min > 0 ? min + 'm ' + sec + 's' : sec + 's'}</span>`);
+  }
+  if (status.updated_at) {
+    meta.push(timeAgo(status.updated_at));
+  }
+  metaEl.innerHTML = meta.join(' · ');
+}
+
+async function loadBotStatus() {
+  try {
+    const res = await fetch(API + '/api/bot-status');
+    if (res.ok) updateBanner(await res.json());
+  } catch (e) { /* ignore */ }
+}
+
+// Tick elapsed time every second while working
+setInterval(() => {
+  if (_bannerStatus && _bannerStatus.state === 'working') renderBannerMeta();
+}, 1000);
+
 // ---- WebSocket live updates ----
 const EVENT_LABELS = {
   task_added: { icon: '+', label: 'Task added' },
@@ -589,6 +646,7 @@ const EVENT_LABELS = {
   task_removed: { icon: '-', label: 'Task removed' },
   memory_stored: { icon: '+', label: 'Memory stored' },
   memory_deleted: { icon: '-', label: 'Memory deleted' },
+  bot_status: { icon: '●', label: 'Bot status' },
 };
 
 function showToast(event) {
@@ -637,6 +695,13 @@ function connectWS() {
   ws.onmessage = (msg) => {
     try {
       const event = JSON.parse(msg.data);
+
+      // Bot status updates go to the banner, not toasts
+      if (event.type === 'bot_status') {
+        updateBanner(event.data);
+        return;
+      }
+
       showToast(event);
 
       // Auto-refresh relevant data
@@ -655,5 +720,6 @@ function connectWS() {
 
 // Init
 loadStats();
+loadBotStatus();
 loadFilters().then(() => applyHash());
 connectWS();

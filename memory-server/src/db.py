@@ -9,7 +9,7 @@ _pool: asyncpg.Pool | None = None
 
 async def init_pool() -> asyncpg.Pool:
     global _pool
-    url = os.environ.get("DATABASE_URL", "postgresql://bot:bot@localhost:5432/bot_memory")
+    url = os.environ.get("DATABASE_URL", "postgresql://bot:bot@localhost:5433/bot_memory")
 
     # First, run schema (creates the vector extension) using a direct connection
     conn = await asyncpg.connect(url)

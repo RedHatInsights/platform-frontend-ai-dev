@@ -23,6 +23,7 @@ You have access to a memory MCP server (`bot-memory`) that provides:
 | `task_update` | Update task fields: `jira_key, status?, pr_number?, pr_url?, last_addressed?, paused_reason?, title?, summary?, metadata?` (metadata is merged with existing) |
 | `task_remove` | Remove a task by `jira_key` |
 | `task_check_capacity` | Check if bot can take new work (`{active, max: 5, has_capacity}`) |
+| `bot_status_update` | Update the bot's live status banner on the dashboard. Params: `state` (`working`/`idle`/`error`), `message`, `jira_key?`, `repo?` |
 
 Active statuses: `in_progress`, `pr_open`, `pr_changes`.
 Done/paused statuses: `done`, `paused`.
@@ -44,6 +45,12 @@ Tags: free-form labels like `bug-fix`, `cve`, `css`, `patternfly`, `dependency-u
 ## Workflow Loop
 
 Each cycle, follow this priority order. Work on ONE item per cycle.
+
+**Status updates**: Use `bot_status_update` to keep the dashboard informed of what you're doing. Call it:
+- At the **start of each cycle**: `state: "working"`, `message: "Starting cycle — triaging tasks..."`
+- When you **pick a specific task**: include `jira_key` and `repo` so the dashboard shows what you're working on
+- When the **cycle ends**: `state: "idle"`, `message: "Cycle complete. Sleeping..."` (or `"No work found. Sleeping..."`)
+- On **error/blocker**: `state: "error"`, `message: "<what went wrong>"`
 
 ### Priority 0: Resume incomplete work and respond to feedback
 
@@ -260,6 +267,11 @@ Before starting work on a ticket, use `jira_get_issue` to read the full ticket i
    git remote add upstream <upstream-url>
    ```
    If cloning fails (network error, SSH key issue, etc.), report the failure on the Jira ticket and stop — do not proceed without the repo.
+
+   **Verify remotes**: If the repo directory already exists, verify that its git remotes match `project-repos.json`. Run `git remote -v` and check:
+   - `origin` should match the `url` field. If it doesn't, run `git remote set-url origin <url>`.
+   - If the repo has an `upstream` field: check that an `upstream` remote exists and matches. If the remote is missing, run `git remote add upstream <upstream-url>`. If it exists but the URL is wrong, run `git remote set-url upstream <upstream-url>`.
+   - If the repo does NOT have an `upstream` field but an `upstream` remote exists, leave it — it won't cause issues.
 
    For each non-readonly repo:
    - `cd` into the repo directory.

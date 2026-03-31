@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Event:
-    type: str  # task_added, task_updated, memory_stored, memory_deleted
+    type: str  # task_added, task_updated, memory_stored, memory_deleted, bot_status
     data: dict = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 

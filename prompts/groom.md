@@ -26,6 +26,7 @@ Figure out which repo(s) are involved. The bot can only work on repos listed in 
 | `notifications-frontend` | frontend | Notification preferences & event log |
 | `learning-resources` | frontend | Learning resources / quickstarts UI |
 | `frontend-operator` | operator | Kubernetes frontend operator |
+| `widget-layout-backend` | backend | Widget layout backend (Go) |
 | `quickstarts` | backend | Quickstarts backend service |
 | `chrome-service-backend` | backend | Chrome service backend |
 | `astro-virtual-assistant-v2` | backend | Virtual assistant backend |

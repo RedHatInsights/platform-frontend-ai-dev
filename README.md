@@ -93,6 +93,9 @@ dev-bot/
   project-repos.json     # repo label -> git URL + persona mapping
   CLAUDE.md              # Full agent instructions (the bot's brain)
   .mcp.json              # MCP server connections (Jira, memory, browser)
+  costs.sh               # Cost report script
+  costs.jsonl            # Per-cycle cost records (auto-generated)
+  bot.log                # Full cycle output log
   memory-server/         # Persistent memory + task tracking (Docker)
     src/
       server.py          # FastMCP + Starlette + WebSocket
@@ -254,6 +257,47 @@ claude --print \
 ```
 
 MCP servers are configured in `.mcp.json` (project-level) and `personas/*/mcp.json` (per-persona tools like PatternFly docs).
+
+## Cost tracking
+
+Each bot cycle records its cost to `costs.jsonl` — tokens used, duration, model, and USD cost extracted from Claude CLI's stream-json output.
+
+```bash
+# View all recorded cycles
+./costs.sh
+
+# Today's cycles only
+./costs.sh today
+
+# Specific date
+./costs.sh 2026-03-31
+
+# Last 7 days
+./costs.sh week
+
+# Backfill from bot.log (if costs.jsonl is missing or you want to import historical data)
+./costs.sh backfill
+```
+
+Each entry in `costs.jsonl` is a JSON object:
+
+```json
+{
+  "timestamp": "2026-03-31T12:00:00+00:00",
+  "label": "hcc-ai-framework",
+  "session_id": "...",
+  "num_turns": 28,
+  "duration_ms": 179225,
+  "cost_usd": 1.38,
+  "input_tokens": 40,
+  "output_tokens": 5074,
+  "cache_read_tokens": 1579336,
+  "cache_write_tokens": 74519,
+  "model": "claude-opus-4-6",
+  "is_error": false,
+  "no_work": false
+}
+```
 
 ## Example
 

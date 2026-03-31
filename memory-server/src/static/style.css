@@ -9,12 +9,100 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 .app { max-width: 1400px; margin: 0 auto; padding: 16px; }
-header { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
 header img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
 header h1 { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, #4ecdc4, #58a6ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: -0.5px; }
 .stats-bar { display: flex; gap: 16px; font-size: 13px; color: var(--text-dim); margin-left: auto; }
 .stat { display: flex; align-items: center; gap: 4px; }
 .stat .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Bot status banner */
+.bot-banner {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 18px; margin: 14px 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  font-size: 13px; color: var(--text-dim);
+  transition: border-color .4s ease, background .4s ease, box-shadow .4s ease;
+  overflow: hidden;
+}
+.bot-banner.state-working {
+  border-color: rgba(210,153,34,.35);
+  background: linear-gradient(90deg, rgba(210,153,34,.08) 0%, var(--surface) 60%);
+  box-shadow: 0 0 20px rgba(210,153,34,.06);
+}
+.bot-banner.state-error {
+  border-color: rgba(248,81,73,.35);
+  background: linear-gradient(90deg, rgba(248,81,73,.08) 0%, var(--surface) 60%);
+  box-shadow: 0 0 20px rgba(248,81,73,.06);
+}
+.bot-banner.state-idle {
+  border-color: rgba(63,185,80,.2);
+}
+.bot-banner-indicator {
+  position: relative;
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+  background: var(--text-dim);
+  transition: background .4s ease, box-shadow .4s ease;
+}
+.bot-banner.state-working .bot-banner-indicator {
+  background: var(--yellow);
+  box-shadow: 0 0 8px rgba(210,153,34,.5);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+.bot-banner.state-idle .bot-banner-indicator {
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(63,185,80,.3);
+}
+.bot-banner.state-error .bot-banner-indicator {
+  background: var(--red);
+  box-shadow: 0 0 8px rgba(248,81,73,.5);
+  animation: pulse-dot-red 1.5s ease-in-out infinite;
+}
+/* Ping ring for working state */
+.bot-banner.state-working .bot-banner-indicator::after {
+  content: '';
+  position: absolute; inset: -3px;
+  border-radius: 50%;
+  border: 2px solid var(--yellow);
+  animation: ping-ring 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+@keyframes pulse-dot-red {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+@keyframes ping-ring {
+  0% { transform: scale(1); opacity: .6; }
+  75%, 100% { transform: scale(2.2); opacity: 0; }
+}
+.bot-banner-content { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.bot-banner-state {
+  font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+  padding: 3px 10px; border-radius: 10px;
+  background: rgba(139,148,158,.15); color: var(--text-dim);
+  flex-shrink: 0;
+}
+.bot-banner.state-working .bot-banner-state { background: rgba(210,153,34,.15); color: var(--yellow); }
+.bot-banner.state-error .bot-banner-state { background: rgba(248,81,73,.15); color: var(--red); }
+.bot-banner.state-idle .bot-banner-state { background: rgba(63,185,80,.12); color: var(--green); }
+.bot-banner-msg {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--text); font-size: 13px;
+  animation: banner-msg-in .4s ease;
+}
+@keyframes banner-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.bot-banner-meta {
+  display: flex; gap: 10px; flex-shrink: 0; font-size: 12px; color: var(--text-dim);
+  align-items: center;
+}
+.bot-banner-meta a { font-size: 12px; }
+.bot-banner-timer { font-variant-numeric: tabular-nums; font-weight: 500; }
 
 .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
 .tab { padding: 8px 16px; cursor: pointer; color: var(--text-dim); border-bottom: 2px solid transparent; font-size: 14px; }

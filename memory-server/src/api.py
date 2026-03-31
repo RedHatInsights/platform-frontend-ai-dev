@@ -197,6 +197,21 @@ async def api_memory_delete(request: Request) -> JSONResponse:
     return JSONResponse({"deleted": True, "id": int(memory_id)})
 
 
+async def api_bot_status(request: Request) -> JSONResponse:
+    pool = get_pool()
+    row = await pool.fetchrow("SELECT * FROM bot_status WHERE id = 1")
+    if not row:
+        return JSONResponse({"state": "unknown", "message": ""})
+    return JSONResponse({
+        "state": row["state"],
+        "message": row["message"],
+        "jira_key": row["jira_key"],
+        "repo": row["repo"],
+        "cycle_start": row["cycle_start"].isoformat() if row["cycle_start"] else None,
+        "updated_at": row["updated_at"].isoformat(),
+    })
+
+
 async def api_tags(request: Request) -> JSONResponse:
     pool = get_pool()
     rows = await pool.fetch(

@@ -11,7 +11,7 @@ from pgvector.asyncpg import register_vector
 
 
 async def main():
-    url = os.environ.get("DATABASE_URL", "postgresql://bot:bot@localhost:5432/bot_memory")
+    url = os.environ.get("DATABASE_URL", "postgresql://bot:bot@localhost:5433/bot_memory")
     conn = await asyncpg.connect(url)
 
     # Run schema and register vector type

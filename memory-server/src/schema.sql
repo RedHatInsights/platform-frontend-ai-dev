@@ -52,6 +52,17 @@ EXCEPTION
     WHEN duplicate_column THEN NULL;
 END $$;
 
+CREATE TABLE IF NOT EXISTS bot_status (
+    id              INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    state           TEXT NOT NULL DEFAULT 'idle',
+    message         TEXT NOT NULL DEFAULT '',
+    jira_key        TEXT,
+    repo            TEXT,
+    cycle_start     TIMESTAMPTZ,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO bot_status (id) VALUES (1) ON CONFLICT DO NOTHING;
+
 -- Only create index if table has enough rows (ivfflat needs data)
 -- On first startup with empty table, queries fall back to sequential scan
 -- Re-run this after seeding data:

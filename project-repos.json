@@ -11,6 +11,10 @@
     "url": "git@github.com:RedHatInsights/widget-layout.git",
     "persona": "frontend"
   },
+  "widget-layout-backend": {
+    "url": "git@github.com:RedHatInsights/widget-layout-backend.git",
+    "persona": "backend"
+  },
   "notifications-frontend": {
     "url": "git@github.com:RedHatInsights/notifications-frontend.git",
     "persona": "frontend"

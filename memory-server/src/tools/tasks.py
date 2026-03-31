@@ -187,3 +187,37 @@ def register_task_tools(mcp: FastMCP):
             "max": MAX_ACTIVE,
             "has_capacity": count < MAX_ACTIVE,
         }
+
+    @mcp.tool()
+    async def bot_status_update(
+        state: str,
+        message: str,
+        jira_key: Optional[str] = None,
+        repo: Optional[str] = None,
+    ) -> dict:
+        """Update the bot's current activity status. Call this at the start and end of each cycle,
+        and when switching between tasks.
+        state: 'working', 'idle', 'error'.
+        message: Human-readable description of what the bot is doing right now.
+        jira_key: The ticket being worked on (if any).
+        repo: The repo being worked in (if any)."""
+        pool = get_pool()
+        row = await pool.fetchrow(
+            """
+            UPDATE bot_status SET state = $1, message = $2, jira_key = $3, repo = $4,
+                cycle_start = CASE WHEN state = 'idle' AND $1 = 'working' THEN NOW() ELSE cycle_start END,
+                updated_at = NOW()
+            WHERE id = 1 RETURNING *
+            """,
+            state, message, jira_key, repo,
+        )
+        result = {
+            "state": row["state"],
+            "message": row["message"],
+            "jira_key": row["jira_key"],
+            "repo": row["repo"],
+            "cycle_start": row["cycle_start"].isoformat() if row["cycle_start"] else None,
+            "updated_at": row["updated_at"].isoformat(),
+        }
+        await bus.publish(Event("bot_status", result))
+        return result
