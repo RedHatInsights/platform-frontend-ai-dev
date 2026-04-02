@@ -1,5 +1,6 @@
 # Stage 1: Build the React dashboard
-FROM node:22-slim AS dashboard
+FROM registry.access.redhat.com/ubi9/nodejs-22:latest AS dashboard
+USER 0
 WORKDIR /app/dashboard
 COPY dashboard/package.json dashboard/package-lock.json* ./
 RUN npm ci
@@ -7,10 +8,12 @@ COPY dashboard/ .
 RUN npm run build
 
 # Stage 2: Python memory server
-FROM python:3.12-slim
-WORKDIR /app
+FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
+USER 0
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+RUN pip3 install uv
+
+WORKDIR /app
 
 COPY memory-server/pyproject.toml memory-server/uv.lock* ./
 RUN uv sync --frozen --no-dev --no-install-project

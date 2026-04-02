@@ -1,33 +1,42 @@
-FROM python:3.12-slim
+FROM registry.access.redhat.com/ubi9/ubi:latest
 
-# System deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Add EPEL + CentOS Stream repos (needed for Chromium deps)
+RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
+    && echo -e "[centos-stream-baseos]\nname=CentOS Stream 9 - BaseOS\nbaseurl=https://mirror.stream.centos.org/9-stream/BaseOS/\$basearch/os/\ngpgcheck=0\nenabled=1" > /etc/yum.repos.d/centos-stream-baseos.repo \
+    && echo -e "[centos-stream-appstream]\nname=CentOS Stream 9 - AppStream\nbaseurl=https://mirror.stream.centos.org/9-stream/AppStream/\$basearch/os/\ngpgcheck=0\nenabled=1" > /etc/yum.repos.d/centos-stream-appstream.repo
+
+# System deps + Python 3.12 + headless Chromium
+RUN dnf install -y --nodocs --allowerasing \
+    python3.12 python3.12-pip python3.12-devel \
+    chromium-headless \
     git \
-    openssh-client \
-    gnupg \
+    openssh-clients \
     curl \
     jq \
-    && rm -rf /var/lib/apt/lists/*
+    && dnf clean all
 
-# Node.js (for Claude Code runtime + LSP)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Node.js 22 via NodeSource (UBI repos only have Node 16)
+RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - \
+    && dnf install -y --nodocs nodejs \
+    && dnf clean all
+
+
+# Make python3.12 the default
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python
 
 # gh CLI
-RUN ARCH=$(dpkg --print-architecture) \
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_linux_${ARCH}.tar.gz" \
     | tar -xz -C /usr/local --strip-components=1
 
 # glab CLI
-RUN ARCH=$(dpkg --print-architecture) \
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/v1.51.0/downloads/glab_1.51.0_linux_${ARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin --strip-components=2 bin/glab
 
 # uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && cp /root/.local/bin/uv /usr/local/bin/uv \
-    && cp /root/.local/bin/uvx /usr/local/bin/uvx
+RUN pip3.12 install uv
 
 # Non-root user (Claude Code rejects root)
 RUN useradd -m -s /bin/bash botuser
@@ -53,7 +62,7 @@ USER botuser
 
 # SSH config
 RUN mkdir -p /home/botuser/.ssh && chmod 700 /home/botuser/.ssh
-RUN echo "Host github.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n\nHost gitlab.cee.redhat.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new" \
+RUN echo -e "Host github.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n\nHost gitlab.cee.redhat.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new" \
     > /home/botuser/.ssh/config && chmod 600 /home/botuser/.ssh/config
 
 # Pre-add known host keys so first connection doesn't warn
@@ -61,7 +70,7 @@ RUN ssh-keyscan -t ed25519,rsa,ecdsa github.com >> /home/botuser/.ssh/known_host
     && ssh-keyscan -t ed25519,rsa,ecdsa gitlab.cee.redhat.com >> /home/botuser/.ssh/known_hosts 2>/dev/null; \
     chmod 600 /home/botuser/.ssh/known_hosts
 
-# Git config (repo-local style but set as user defaults inside the container)
+# Git config
 RUN git config --global user.name "platex-rehor-bot" \
     && git config --global user.email "platform-experience-services@redhat.com" \
     && git config --global gpg.format openpgp \

@@ -54,7 +54,7 @@ memory-server-stop: ## Stop memory server + postgres
 	docker compose -f memory-server/docker-compose.yml down
 
 docker-up: ## Start full stack (postgres + memory server + bot)
-	docker compose up --build
+	docker compose up
 
 docker-down: ## Stop full stack
 	docker compose down
