@@ -13,6 +13,8 @@ RUN dnf install -y --nodocs --allowerasing \
     openssh-clients \
     curl \
     jq \
+    bubblewrap \
+    socat \
     && dnf clean all
 
 # Node.js 22 via NodeSource (UBI repos only have Node 16)
@@ -51,7 +53,7 @@ ENV CLAUDE_CODE_USE_VERTEX=1
 ENV VERTEX_LOCATION=global
 
 # Copy bot config files
-COPY config.json project-repos.json CLAUDE.md .mcp.json ./
+COPY config.json project-repos.json CLAUDE.md .mcp.json entrypoint.sh ./
 COPY .claude/ .claude/
 COPY personas/ personas/
 
@@ -60,9 +62,9 @@ RUN chown -R botuser:botuser /home/botuser/app
 
 USER botuser
 
-# SSH config
+# SSH config — tunnel through Squid proxy for network isolation
 RUN mkdir -p /home/botuser/.ssh && chmod 700 /home/botuser/.ssh
-RUN echo -e "Host github.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n\nHost gitlab.cee.redhat.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new" \
+RUN echo -e "Host github.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n  ProxyCommand socat - PROXY:proxy:%h:%p,proxyport=3128\n\nHost gitlab.cee.redhat.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n  ProxyCommand socat - PROXY:proxy:%h:%p,proxyport=3128" \
     > /home/botuser/.ssh/config && chmod 600 /home/botuser/.ssh/config
 
 # Pre-add known host keys so first connection doesn't warn
@@ -76,4 +78,4 @@ RUN git config --global user.name "platex-rehor-bot" \
     && git config --global gpg.format openpgp \
     && git config --global commit.gpgsign true
 
-CMD ["bash"]
+ENTRYPOINT ["bash", "entrypoint.sh"]
