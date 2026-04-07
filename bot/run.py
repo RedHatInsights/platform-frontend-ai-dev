@@ -14,20 +14,22 @@ from dotenv import load_dotenv
 from filelock import FileLock, Timeout
 
 from .agent import run_cycle
-from .config import ALLOWED_TOOLS, Config, load_config, load_mcp_servers
+from .config import ALLOWED_TOOLS, Config, load_config, load_mcp_servers, sanitize_env
 from .costs import record_cost
 
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = SCRIPT_DIR / "data"
 
 
 def setup_logging() -> None:
-    """Configure logging to stdout and bot.log."""
+    """Configure logging to stdout and data/bot.log."""
+    DATA_DIR.mkdir(exist_ok=True)
     fmt = "[%(asctime)s] %(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
 
     handlers: list[logging.Handler] = [
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(SCRIPT_DIR / "bot.log", mode="a"),
+        logging.FileHandler(DATA_DIR / "bot.log", mode="a"),
     ]
 
     logging.basicConfig(
@@ -62,8 +64,13 @@ def main() -> None:
     config = load_config(SCRIPT_DIR)
     mcp_servers = load_mcp_servers(SCRIPT_DIR)
 
+    # Remove secrets from env so Bash subprocesses can't leak them.
+    # MCP servers already have resolved values. gh/glab use config files.
+    sanitize_env()
+    logger.info("Sanitized environment — secrets removed from env vars.")
+
     # Lock file — prevent concurrent runs
-    lock = FileLock(SCRIPT_DIR / ".lock", timeout=0)
+    lock = FileLock(DATA_DIR / ".lock", timeout=0)
     try:
         lock.acquire()
     except Timeout:
@@ -101,7 +108,7 @@ def main() -> None:
 
             if result is not None:
                 no_work = record_cost(
-                    costs_file=SCRIPT_DIR / "costs.jsonl",
+                    costs_file=DATA_DIR / "costs.jsonl",
                     label=args.label,
                     result=result,
                     ctx=ctx,

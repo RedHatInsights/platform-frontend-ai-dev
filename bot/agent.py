@@ -101,7 +101,7 @@ async def run_cycle(
         mcp_servers=mcp_servers,
         setting_sources=["project"],
         cwd=cwd,
-        permission_mode="bypassPermissions",
+        permission_mode="acceptEdits",
     )
 
     prompt = (

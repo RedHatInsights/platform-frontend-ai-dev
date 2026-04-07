@@ -9,8 +9,8 @@
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COSTS_FILE="$SCRIPT_DIR/costs.jsonl"
-BOT_LOG="$SCRIPT_DIR/bot.log"
+COSTS_FILE="$SCRIPT_DIR/data/costs.jsonl"
+BOT_LOG="$SCRIPT_DIR/data/bot.log"
 
 if [ "${1:-}" = "backfill" ]; then
   echo "Backfilling costs.jsonl from bot.log..."

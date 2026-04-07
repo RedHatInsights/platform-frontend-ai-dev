@@ -2,14 +2,16 @@ repos/
 .credentials
 .env
 extensions/
-.lock
-bot.log
-.claude/
+data/*
+!data/.gitkeep
+# Claude Code local settings (machine-specific paths)
+.claude/settings.local.json
+# Claude Code task cache
+.claude/todos/
 state/*
 grooming-notes.md
 report.md
 .chrome-profile/
-costs.jsonl
 __pycache__/
 *.pyc
 .venv/

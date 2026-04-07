@@ -21,19 +21,19 @@ run-rbac: ## Run the bot with platform-accessmanagement label
 	uv run dev-bot --label hcc-ai-platform-accessmanagement
 
 stop: ## Stop a running bot (release lock)
-	@if [ -f .lock ]; then \
-		pid=$$(cat .lock 2>/dev/null); \
+	@if [ -f data/.lock ]; then \
+		pid=$$(cat data/.lock 2>/dev/null); \
 		if [ -n "$$pid" ] && kill -0 "$$pid" 2>/dev/null; then \
 			kill "$$pid" && echo "Stopped bot (PID $$pid)"; \
 		else \
-			rm -f .lock && echo "Removed stale lock"; \
+			rm -f data/.lock && echo "Removed stale lock"; \
 		fi \
 	else \
 		echo "No bot running"; \
 	fi
 
 logs: ## Tail bot log
-	tail -f bot.log
+	tail -f data/bot.log
 
 costs: ## Show all cost data
 	./costs.sh all
@@ -45,7 +45,7 @@ costs-week: ## Show this week's costs
 	./costs.sh week
 
 seed-costs: ## Import costs.jsonl into the database
-	uv run python scripts/seed-costs.py costs.jsonl
+	uv run python scripts/seed-costs.py data/costs.jsonl
 
 memory-server: ## Start memory server + postgres
 	docker compose -f memory-server/docker-compose.yml up --build

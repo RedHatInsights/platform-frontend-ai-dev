@@ -1,6 +1,8 @@
 """Configuration loading for the dev bot."""
 
 import json
+import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -43,14 +45,56 @@ def load_mcp_servers(script_dir: Path) -> dict:
         with open(bot_mcp) as f:
             data = json.load(f)
         for name, cfg in data.get("mcpServers", {}).items():
-            servers[name] = cfg
+            servers[name] = _resolve_env_vars(cfg)
 
     for mcp_file in sorted(script_dir.glob("personas/*/mcp.json")):
         with open(mcp_file) as f:
             data = json.load(f)
         for name, cfg in data.get("mcpServers", {}).items():
-            servers[name] = cfg
+            servers[name] = _resolve_env_vars(cfg)
     return servers
+
+
+def _resolve_env_vars(obj):
+    """Recursively resolve ${VAR} references in MCP server configs.
+
+    This lets us remove secrets from os.environ before starting the agent
+    while still passing them to MCP servers via resolved literal values.
+    """
+    if isinstance(obj, str):
+        return re.sub(
+            r"\$\{(\w+)\}",
+            lambda m: os.environ.get(m.group(1), ""),
+            obj,
+        )
+    if isinstance(obj, dict):
+        return {k: _resolve_env_vars(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_resolve_env_vars(v) for v in obj]
+    return obj
+
+
+# Env vars that contain secrets and must be removed before starting
+# the agent. MCP servers get resolved values; gh/glab use config files.
+SECRET_ENV_VARS = [
+    "JIRA_API_TOKEN",
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "GITLAB_TOKEN",
+    "SSH_PRIVATE_KEY_B64",
+    "GPG_PRIVATE_KEY_B64",
+    "GOOGLE_SA_KEY_B64",
+]
+
+
+def sanitize_env() -> None:
+    """Remove secret env vars so Bash subprocesses can't leak them.
+
+    Call this AFTER load_mcp_servers() (which resolves ${VAR} references)
+    and after gh/glab auth setup (which writes tokens to config files).
+    """
+    for var in SECRET_ENV_VARS:
+        os.environ.pop(var, None)
 
 
 ALLOWED_TOOLS = [
