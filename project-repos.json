@@ -1,60 +1,79 @@
 {
   "insights-chrome": {
-    "url": "git@github.com:RedHatInsights/insights-chrome.git",
-    "personas": ["frontend", "cve"]
+    "url": "git@github.com:RedHatInsights/insights-chrome.git"
   },
   "astro-virtual-assistant-frontend": {
-    "url": "git@github.com:RedHatInsights/astro-virtual-assistant-frontend.git",
-    "personas": ["frontend"]
+    "url": "git@github.com:RedHatInsights/astro-virtual-assistant-frontend.git"
   },
   "widget-layout": {
-    "url": "git@github.com:RedHatInsights/widget-layout.git",
-    "personas": ["frontend"]
+    "url": "git@github.com:RedHatInsights/widget-layout.git"
   },
   "widget-layout-backend": {
-    "url": "git@github.com:RedHatInsights/widget-layout-backend.git",
-    "personas": ["backend"]
+    "url": "git@github.com:RedHatInsights/widget-layout-backend.git"
   },
   "notifications-frontend": {
-    "url": "git@github.com:RedHatInsights/notifications-frontend.git",
-    "personas": ["frontend", "cve"]
+    "url": "git@github.com:RedHatInsights/notifications-frontend.git"
   },
   "frontend-operator": {
-    "url": "git@github.com:RedHatInsights/frontend-operator.git",
-    "personas": ["operator"]
+    "url": "git@github.com:RedHatInsights/frontend-operator.git"
   },
   "app-interface": {
     "url": "git@gitlab.cee.redhat.com:mmarosi/app-interface.git",
     "upstream": "git@gitlab.cee.redhat.com:service/app-interface.git",
-    "personas": ["config"],
     "host": "gitlab"
   },
   "quickstarts": {
-    "url": "git@github.com:RedHatInsights/quickstarts.git",
-    "personas": ["backend"]
+    "url": "git@github.com:RedHatInsights/quickstarts.git"
   },
   "learning-resources": {
-    "url": "git@github.com:RedHatInsights/learning-resources.git",
-    "personas": ["frontend"]
+    "url": "git@github.com:RedHatInsights/learning-resources.git"
   },
   "payload-tracker-frontend": {
-    "url": "git@github.com:RedHatInsights/payload-tracker-frontend.git",
-    "personas": ["frontend", "cve"]
+    "url": "git@github.com:RedHatInsights/payload-tracker-frontend.git"
   },
   "pdf-generator": {
-    "url": "git@github.com:RedHatInsights/pdf-generator.git",
-    "personas": ["backend", "cve"]
+    "url": "git@github.com:RedHatInsights/pdf-generator.git"
   },
   "chrome-service-backend": {
-    "url": "git@github.com:RedHatInsights/chrome-service-backend.git",
-    "personas": ["backend"]
+    "url": "git@github.com:RedHatInsights/chrome-service-backend.git"
   },
   "astro-virtual-assistant-v2": {
-    "url": "git@github.com:RedHatInsights/astro-virtual-assistant-v2.git",
-    "personas": ["backend"]
+    "url": "git@github.com:RedHatInsights/astro-virtual-assistant-v2.git"
   },
   "insights-rbac": {
-    "url": "git@github.com:RedHatInsights/insights-rbac.git",
-    "personas": ["backend", "rbac"]
+    "url": "git@github.com:RedHatInsights/insights-rbac.git"
+  },
+  "javascript-clients": {
+    "url": "git@github.com:RedHatInsights/javascript-clients.git"
+  },
+  "frontend-components": {
+    "url": "git@github.com:RedHatInsights/frontend-components.git"
+  },
+  "patchman-ui": {
+    "url": "git@github.com:RedHatInsights/patchman-ui.git"
+  },
+  "insights-advisor-frontend": {
+    "url": "git@github.com:RedHatInsights/insights-advisor-frontend.git"
+  },
+  "ocp-advisor-frontend": {
+    "url": "git@github.com:RedHatInsights/ocp-advisor-frontend.git"
+  },
+  "insights-remediations-frontend": {
+    "url": "git@github.com:RedHatInsights/insights-remediations-frontend.git"
+  },
+  "insights-inventory-frontend": {
+    "url": "git@github.com:RedHatInsights/insights-inventory-frontend.git"
+  },
+  "malware-detection-frontend": {
+    "url": "git@github.com:RedHatInsights/malware-detection-frontend.git"
+  },
+  "vuln4shift-frontend": {
+    "url": "git@github.com:RedHatInsights/vuln4shift-frontend.git"
+  },
+  "insights-frontend-builder-common": {
+    "url": "git@github.com:RedHatInsights/insights-frontend-builder-common.git"
+  },
+  "frontend-development-proxy": {
+    "url": "git@github.com:RedHatInsights/frontend-development-proxy.git"
   }
 }

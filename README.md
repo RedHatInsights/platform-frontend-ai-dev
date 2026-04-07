@@ -138,8 +138,7 @@ The bot is a good developer but has zero tribal knowledge. Don't assume it knows
 1. Add to `project-repos.json`:
    ```json
    "my-repo": {
-     "url": "git@github.com:RedHatInsights/my-repo.git",
-     "personas": ["frontend"]
+     "url": "git@github.com:RedHatInsights/my-repo.git"
    }
    ```
 2. Add a `repo:my-repo` label to the Jira ticket
@@ -154,25 +153,15 @@ If the bot doesn't have push access to the upstream repo, use a fork:
 "app-interface": {
   "url": "git@gitlab.cee.redhat.com:youruser/app-interface.git",
   "upstream": "git@gitlab.cee.redhat.com:service/app-interface.git",
-  "personas": ["config"],
   "host": "gitlab"
 }
 ```
 
 The bot clones from the fork, syncs from upstream, pushes branches to the fork, and opens MRs targeting the upstream repo.
 
-### Multi-persona repos
+### Persona selection
 
-A repo can support multiple personas. The bot selects the best fit based on the ticket:
-
-```json
-"insights-rbac": {
-  "url": "git@github.com:RedHatInsights/insights-rbac.git",
-  "personas": ["backend", "rbac"]
-}
-```
-
-If a ticket is about RBAC-specific Django work, the bot loads the `rbac` persona. For generic backend work, it uses `backend`.
+Personas are NOT hardcoded to repos. The bot dynamically selects the best-fit persona(s) based on the ticket description and the repo's tech stack (e.g. `package.json` → `frontend`, `go.mod` → `backend`/`operator`, Dockerfile-only → `tooling`, config repo → `config`). For CVE tickets, the `cve` persona layers on top of the base persona.
 
 ## Running the services
 
@@ -262,7 +251,8 @@ Each repo has one or more personas that provide domain-specific guidelines. Pers
 | `rbac` | Django/DRF RBAC service (insights-rbac). Docker Compose dev env, `make unittest-fast`. |
 | `operator` | Kubernetes operators (Go). |
 | `config` | Config repos (app-interface). Read-only or GitLab MR workflow. |
-| `cve` | CVE remediation — dependency upgrades and security scanning. |
+| `cve` | CVE remediation — dependency upgrades, base image updates, security scanning. |
+| `tooling` | Build/dev infrastructure — Dockerfiles, shell scripts, proxy configs. |
 
 ## Memory system
 

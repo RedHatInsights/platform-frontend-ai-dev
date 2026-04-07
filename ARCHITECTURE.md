@@ -89,7 +89,7 @@ The actual intelligence. Claude Code is spawned as a subprocess by the Agent SDK
 - **Prompt**: `"Your primary label is: <label>. Follow the instructions in CLAUDE.md."`
 - **CLAUDE.md**: detailed behavioral instructions covering the full workflow (priority system, PR maintenance, ticket claiming, implementation guidelines, memory usage, progress tracking)
 - **Tools**: Built-in (Read, Write, Edit, Bash, Grep, Glob, LSP) + MCP tools (Jira, memory, browser)
-- **Persona prompts**: Loaded from `personas/<type>/prompt.md` based on which repo it's working in
+- **Persona prompts**: Loaded from `personas/<type>/prompt.md` based on the ticket's nature and repo tech stack
 
 The agent has no persistent state between cycles. All state is stored in the memory server (task records) and reconstructed at the start of each cycle.
 
@@ -132,16 +132,17 @@ Runs as two Docker containers:
 
 Domain-specific guidelines that tell the agent how to work in different types of repos. Each persona is a markdown file with coding standards, testing commands, and conventions.
 
-| Persona | Repos | Key Details |
-|---------|-------|-------------|
+| Persona | Applies to | Key Details |
+|---------|------------|-------------|
 | `frontend` | React/TS/PatternFly apps | `npm run lint/test`, visual verification via browser MCP, PatternFly component MCP |
 | `backend` | Go and Node.js services | `make test` / `npm test`, Go conventions |
 | `rbac` | insights-rbac (Django/DRF) | Docker Compose dev env, `make unittest-fast`, PostgreSQL + Redis + Celery |
 | `operator` | Kubernetes operators | Go, controller-runtime patterns |
-| `config` | app-interface | GitLab fork workflow, read-only or MR-based |
-| `cve` | CVE remediation | Dependency upgrades, grype scanning |
+| `config` | Config/YAML repos (e.g. app-interface) | GitLab fork workflow, read-only or MR-based |
+| `cve` | CVE remediation (any repo) | Dependency upgrades, base image updates, grype scanning |
+| `tooling` | Build/dev infrastructure | Dockerfiles, shell scripts, proxy configs |
 
-A repo can have multiple personas (e.g. `["frontend", "cve"]`). The agent picks the best fit based on the ticket description.
+Personas are NOT hardcoded to repos. The bot dynamically selects the best-fit persona(s) based on the ticket description and the repo's tech stack (e.g. `package.json` → frontend, `go.mod` → backend/operator, Dockerfile-only → tooling). CVE persona layers on top of the base persona.
 
 ### Target Repos (`repos/`)
 
@@ -150,13 +151,11 @@ Cloned on demand when the bot picks up a ticket. Repo metadata is in `project-re
 ```json
 {
   "notifications-frontend": {
-    "url": "git@github.com:RedHatInsights/notifications-frontend.git",
-    "personas": ["frontend", "cve"]
+    "url": "git@github.com:RedHatInsights/notifications-frontend.git"
   },
   "app-interface": {
     "url": "git@gitlab.cee.redhat.com:yourfork/app-interface.git",
     "upstream": "git@gitlab.cee.redhat.com:service/app-interface.git",
-    "personas": ["config"],
     "host": "gitlab"
   }
 }
@@ -165,7 +164,6 @@ Cloned on demand when the bot picks up a ticket. Repo metadata is in `project-re
 Fields:
 - `url` — git clone URL (may be a fork)
 - `upstream` — (optional) original repo URL. Bot syncs from upstream, pushes to fork, opens MRs against upstream
-- `personas` — applicable persona types
 - `host` — `"gitlab"` for GitLab repos (default: GitHub)
 - `readonly` — if `true`, bot reads only, never pushes
 

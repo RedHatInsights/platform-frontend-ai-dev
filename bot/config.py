@@ -113,6 +113,7 @@ ALLOWED_TOOLS = [
     "mcp__mcp-atlassian__jira_get_sprints_from_board",
     "mcp__mcp-atlassian__jira_add_issues_to_sprint",
     "mcp__mcp-atlassian__jira_create_issue",
+    "mcp__mcp-atlassian__jira_create_issue_link",
     "mcp__mcp-atlassian__jira_get_field_options",
     # Wildcard MCP tools
     "mcp__hcc-patternfly-data-view__*",
