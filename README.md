@@ -277,6 +277,23 @@ The bot has persistent memory via MCP:
 - **Task tracking** — structured records of active work with status, PR links, and progress metadata. Hard cap of 10 concurrent active tasks. When interrupted mid-cycle, the bot saves progress (`last_step`, `next_step`, `files_changed`) so the next cycle resumes seamlessly.
 - **RAG memory** — vector-searchable knowledge base of learnings from completed tickets, PR review feedback, and codebase patterns. The bot searches this before starting any new ticket, so it improves over time.
 
+### Exporting and importing memory
+
+The bot's memory (tasks, learnings, cost data) can be exported and shared so others can bootstrap from existing knowledge.
+
+```bash
+# Export current memory to a SQL dump
+make memory-dump        # → data/memory-dump.sql
+
+# Import on another machine (additive — skips duplicates)
+make memory-import      # ← data/memory-dump.sql
+
+# Full reset — wipe all data and reimport from dump
+make memory-reset
+```
+
+The dump file (`data/memory-dump.sql`) is gitignored. Store it in shared storage (e.g. Google Drive) and distribute to team members setting up new instances.
+
 ## Cost tracking
 
 Each cycle records its cost to `costs.jsonl` and the memory server database.

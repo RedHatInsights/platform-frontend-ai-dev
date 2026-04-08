@@ -1,4 +1,4 @@
-.PHONY: install run init dashboard costs costs-today costs-week seed-costs stop logs help memory-server memory-server-stop memory-dump memory-import
+.PHONY: install run init dashboard costs costs-today costs-week seed-costs stop logs help memory-server memory-server-stop memory-dump memory-import memory-reset
 
 LABEL ?= hcc-ai-framework
 
@@ -52,6 +52,19 @@ memory-server: ## Start memory server + postgres
 
 memory-server-stop: ## Stop memory server + postgres
 	docker compose -f memory-server/docker-compose.yml down
+
+memory-dump: ## Dump memory DB to data/memory-dump.sql
+	docker compose -f memory-server/docker-compose.yml exec -T postgres pg_dump -U bot --data-only --inserts --on-conflict-do-nothing bot_memory > data/memory-dump.sql
+	@echo "Dumped to data/memory-dump.sql"
+
+memory-import: ## Import data from data/memory-dump.sql (additive, skips duplicates)
+	docker compose -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory < data/memory-dump.sql
+	@echo "Imported from data/memory-dump.sql"
+
+memory-reset: ## Wipe and reimport memory DB from data/memory-dump.sql
+	docker compose -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory -c "DELETE FROM bot_status; DELETE FROM cycles; DELETE FROM memories; DELETE FROM tasks;" && \
+	docker compose -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory < data/memory-dump.sql
+	@echo "Reset and imported from data/memory-dump.sql"
 
 docker-up: ## Start full stack (postgres + memory server + bot)
 	docker compose up
