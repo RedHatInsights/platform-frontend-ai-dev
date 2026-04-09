@@ -64,8 +64,9 @@ USER botuser
 
 # SSH config — tunnel through Squid proxy for network isolation
 RUN mkdir -p /home/botuser/.ssh && chmod 700 /home/botuser/.ssh
-RUN echo -e "Host github.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n  ProxyCommand socat - PROXY:proxy:%h:%p,proxyport=3128\n\nHost gitlab.cee.redhat.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n  ProxyCommand socat - PROXY:proxy:%h:%p,proxyport=3128" \
+RUN echo -e "Host github.com-bot\n  HostName github.com\n  User git\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  IdentitiesOnly yes\n  StrictHostKeyChecking accept-new\n  ProxyCommand socat - PROXY:proxy:%h:%p,proxyport=3128\n\nHost gitlab.cee.redhat.com\n  IdentityFile /home/botuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new\n  ProxyCommand socat - PROXY:proxy:%h:%p,proxyport=3128" \
     > /home/botuser/.ssh/config && chmod 600 /home/botuser/.ssh/config
+ENV GIT_SSH_COMMAND="ssh -F /home/botuser/.ssh/config"
 
 # Pre-add known host keys so first connection doesn't warn
 RUN ssh-keyscan -t ed25519,rsa,ecdsa github.com >> /home/botuser/.ssh/known_hosts 2>/dev/null \

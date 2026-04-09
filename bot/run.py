@@ -39,6 +39,11 @@ def setup_ssh(script_dir: Path) -> None:
     gitlab_key = os.environ.get("GITLAB_SSH_KEY")
 
     if not bot_key and not gitlab_key:
+        # No keys configured — check if there's an existing SSH config
+        # in the project dir (e.g. committed to the repo) and use it.
+        fallback = ssh_dir / "config" if (ssh_dir := script_dir / ".ssh").exists() else None
+        if fallback and fallback.exists():
+            os.environ["GIT_SSH_COMMAND"] = f"ssh -F {fallback}"
         return
 
     ssh_dir = script_dir / ".ssh"
@@ -50,7 +55,9 @@ def setup_ssh(script_dir: Path) -> None:
     if bot_key:
         lines += [
             "",
-            "Host github.com",
+            "Host github.com-bot",
+            "  HostName github.com",
+            "  User git",
             f"  IdentityFile {_resolve_path(bot_key)}",
             "  IdentitiesOnly yes",
             "  StrictHostKeyChecking accept-new",

@@ -17,8 +17,11 @@ __pycache__/
 .venv/
 uv.lock
 dashboard/node_modules/
+# Dashboard build output (built in Dockerfile, not committed)
 memory-server/src/static/assets/
 memory-server/src/static/index.html
+memory-server/src/static/app.js
+memory-server/src/static/style.css
 sa-key.json
 .ssh/
 .gitconfig

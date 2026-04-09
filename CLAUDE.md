@@ -128,8 +128,8 @@ A task may have PRs/MRs across multiple repos (check `metadata.prs`). If `metada
 
 **If a PR is merged:**
 - Use `task_update` to set status to `archived` and update `summary` with the final outcome (e.g. "PR merged. Fixed dropdown labels by passing children to PF6 SelectOption.").
-- Use `jira_get_transitions` and `jira_transition_issue` to move the ticket to "Done" (or the appropriate closed status).
-- Update the Jira ticket with a comment noting the PR was merged.
+- Use `jira_get_transitions` and `jira_transition_issue` to move the ticket to "Release Pending" (NOT "Done"). Merging only deploys to stage — the ticket should only move to "Done" after the image is deployed to production, which happens outside the bot's scope.
+- Update the Jira ticket with a comment noting the PR was merged and the fix is deployed to stage.
 - **Update linked issues**: Use `jira_get_issue` to check for linked tickets. For each linked ticket:
   - **Duplicates**: If this ticket was a duplicate of another, comment on the other ticket that the fix has been merged with a link to the PR.
   - **Related**: Post a brief comment noting the related work is complete and linking the merged PR.
@@ -160,8 +160,8 @@ For each ticket found:
    - **GitHub**: `gh pr list --head bot/<TICKET-KEY> --state merged`
    - **GitLab**: `glab mr list --source-branch bot/<TICKET-KEY> --merged`
    If the PR was merged:
-   - Use `jira_get_transitions` and `jira_transition_issue` to move the ticket to "Done".
-   - Use `jira_add_comment` to note the PR was merged and the ticket is complete.
+   - Use `jira_get_transitions` and `jira_transition_issue` to move the ticket to "Release Pending" (NOT "Done" — merging only deploys to stage, not production).
+   - Use `jira_add_comment` to note the PR was merged and the fix is deployed to stage.
    - Use `task_update` to set status to `archived` (if tracked).
    - Use `memory_store` to save what you learned as a `learning` memory.
 
@@ -233,7 +233,7 @@ If the ticket has the label `needs-investigation`, do NOT implement anything. In
 Before starting work on a ticket, use `jira_get_issue` to read the full ticket including its **issue links**. Check for:
 
 1. **Duplicates**: If the ticket is linked as a duplicate of another ticket (link type "Duplicate"), check the other ticket's status:
-   - If the other ticket is already done or has a merged PR — this ticket may already be resolved. Add a comment noting the duplicate is resolved, transition to Done, and skip.
+   - If the other ticket is already done or has a merged PR — this ticket may already be resolved. Add a comment noting the duplicate is resolved, transition to "Release Pending", and skip.
    - If the other ticket is in progress (or tracked in your task list) — add a comment noting the duplicate, link the tickets if not already linked, and skip. Do not work on the same thing twice.
 
 2. **Blocked by / Blocks**: If the ticket is blocked by another issue that is not yet resolved, add a comment noting the blocker and stop. Do not start work on blocked tickets.
