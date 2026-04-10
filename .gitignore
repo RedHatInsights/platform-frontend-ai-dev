@@ -15,7 +15,7 @@ report.md
 __pycache__/
 *.pyc
 .venv/
-uv.lock
+.python-version
 dashboard/node_modules/
 # Dashboard build output (built in Dockerfile, not committed)
 memory-server/src/static/assets/

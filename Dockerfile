@@ -1,27 +1,46 @@
 FROM registry.access.redhat.com/ubi9/ubi:latest
 
-# Add EPEL + CentOS Stream repos (needed for Chromium deps)
-RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
-    && echo -e "[centos-stream-baseos]\nname=CentOS Stream 9 - BaseOS\nbaseurl=https://mirror.stream.centos.org/9-stream/BaseOS/\$basearch/os/\ngpgcheck=0\nenabled=1" > /etc/yum.repos.d/centos-stream-baseos.repo \
-    && echo -e "[centos-stream-appstream]\nname=CentOS Stream 9 - AppStream\nbaseurl=https://mirror.stream.centos.org/9-stream/AppStream/\$basearch/os/\ngpgcheck=0\nenabled=1" > /etc/yum.repos.d/centos-stream-appstream.repo
-
-# System deps + Python 3.12 + headless Chromium
+# System deps + Python 3.12 + Chromium runtime libraries
 RUN dnf install -y --nodocs --allowerasing \
     python3.12 python3.12-pip python3.12-devel \
-    chromium-headless \
     git \
     openssh-clients \
     curl \
     jq \
     bubblewrap \
     socat \
+    alsa-lib \
+    atk \
+    at-spi2-atk \
+    at-spi2-core \
+    cairo \
+    cups-libs \
+    dbus-libs \
+    libdrm \
+    mesa-libgbm \
+    glib2 \
+    nspr \
+    nss \
+    pango \
+    libX11 \
+    libxcb \
+    libXcomposite \
+    libXdamage \
+    libXext \
+    libXfixes \
+    libxkbcommon \
+    libXrandr \
     && dnf clean all
 
-# Node.js 22 via NodeSource (UBI repos only have Node 16)
-RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - \
-    && dnf install -y --nodocs nodejs \
-    && dnf clean all
+# Node.js 22 (official binary tarball)
+RUN ARCH=$(uname -m | sed 's/x86_64/x64/' | sed 's/aarch64/arm64/') \
+    && curl -fsSL "https://nodejs.org/dist/v22.15.0/node-v22.15.0-linux-${ARCH}.tar.gz" \
+    | tar -xz -C /usr/local --strip-components=1
 
+
+# Headless Chromium via Playwright (avoids EPEL/CentOS RPMs)
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+RUN npx playwright install chromium
 
 # Make python3.12 the default
 RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 \
