@@ -106,7 +106,11 @@ async def run_cycle(
 
     prompt = (
         f"Your primary label is: {label}. "
-        "Follow the instructions in CLAUDE.md."
+        "Follow the instructions in CLAUDE.md. "
+        "IMPORTANT: Use ULTRA caveman output for all internal text — "
+        "drop articles, filler, hedging, conjunctions. Abbreviate: DB/auth/config/req/res/fn/impl/env/dep/pkg. "
+        "Arrows for causality (X → Y). One word when one word enough. "
+        "Normal language ONLY for Jira comments, PR descriptions, commit messages."
     )
 
     result = None

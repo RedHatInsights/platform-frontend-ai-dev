@@ -109,7 +109,8 @@
     "upstream": "git@github.com:RedHatInsights/user-preferences-frontend.git"
   },
   "caddy-ubi": {
-    "url": "git@gitlab.cee.redhat.com:insights-platform/caddy-ubi.git",
+    "url": "git@gitlab.cee.redhat.com:mmarosi/caddy-ubi.git",
+    "upstream": "git@gitlab.cee.redhat.com:insights-platform/caddy-ubi.git",
     "host": "gitlab"
   },
   "api-documentation-frontend": {

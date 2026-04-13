@@ -22,8 +22,10 @@ async def api_tasks(request: Request) -> JSONResponse:
         total = await pool.fetchval(
             "SELECT COUNT(*) FROM tasks WHERE status = $1::task_status", status
         )
+        # Archived tasks sort by last_addressed (≈ archive time); others by created_at
+        order_col = "last_addressed" if status == "archived" else "created_at"
         rows = await pool.fetch(
-            "SELECT * FROM tasks WHERE status = $1::task_status ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            f"SELECT * FROM tasks WHERE status = $1::task_status ORDER BY {order_col} DESC LIMIT $2 OFFSET $3",
             status, limit, offset,
         )
     elif exclude:
