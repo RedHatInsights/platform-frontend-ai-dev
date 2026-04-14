@@ -54,7 +54,7 @@ services:
       dockerfile: Dockerfile
     security_opt:
       - no-new-privileges
-    mem_limit: 4g
+    mem_limit: 8g
     cpus: 4
     pids_limit: 500
     env_file:
@@ -66,6 +66,8 @@ services:
       - GOOGLE_SA_KEY_B64
       - BOT_LABEL=${BOT_LABEL:-hcc-ai-framework}
       - BOT_MEMORY_URL=http://memory-server:8080/sse
+      - COSTS_API_URL=http://memory-server:8080/api/costs
+      - BOT_DASHBOARD_URL=http://memory-server:8080/api/bot-status
       - GOOGLE_APPLICATION_CREDENTIALS=/home/botuser/sa-key.json
       # Route all HTTP/HTTPS through the Squid proxy
       - HTTP_PROXY=http://proxy:3128
