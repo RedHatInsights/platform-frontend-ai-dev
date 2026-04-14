@@ -56,7 +56,7 @@ services:
       - no-new-privileges
     mem_limit: 4g
     cpus: 4
-    pids_limit: 200
+    pids_limit: 500
     env_file:
       - .env
     environment:
