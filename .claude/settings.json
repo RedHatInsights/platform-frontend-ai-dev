@@ -63,10 +63,10 @@
     ]
   },
   "sandbox": {
-    "enabled": true,
+    "enabled": false,
     "autoAllow": true,
-    "allowUnsandboxedCommands": false,
-    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": true,
+    "failIfUnavailable": false,
     "filesystem": {
       "allowWrite": [
         "./repos",
