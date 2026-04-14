@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "chrome-devtools": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp@latest", "--browserUrl", "http://127.0.0.1:9222", "--acceptInsecureCerts"]
+      "command": "chrome-devtools-mcp",
+      "args": ["--browserUrl", "http://127.0.0.1:9222", "--acceptInsecureCerts"]
     },
     "bot-memory": {
       "type": "sse",

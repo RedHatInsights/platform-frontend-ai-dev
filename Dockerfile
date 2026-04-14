@@ -55,13 +55,32 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/v1.51.0/downloads/glab_1.51.0_linux_${ARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin --strip-components=2 bin/glab
 
+# bubblewrap (sandbox runtime for Claude Code)
+RUN dnf install -y --nodocs gcc libcap-devel \
+    && pip3.12 install meson ninja \
+    && git clone --depth 1 --branch v0.11.1 https://github.com/containers/bubblewrap.git /tmp/bwrap \
+    && cd /tmp/bwrap \
+    && meson setup _builddir \
+    && meson compile -C _builddir \
+    && meson install -C _builddir \
+    && cd / && rm -rf /tmp/bwrap \
+    && pip3.12 uninstall -y meson ninja \
+    && dnf remove -y gcc \
+    && dnf clean all
+
 # grype (container image vulnerability scanner)
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://github.com/anchore/grype/releases/download/v0.87.0/grype_0.87.0_linux_${ARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin grype
 
+# Pre-install MCP servers so they don't need network at runtime
+RUN npm install -g chrome-devtools-mcp@latest @redhat-cloud-services/hcc-pf-mcp
+
 # uv
 RUN pip3.12 install uv
+
+# Pre-install mcp-atlassian so uvx doesn't need network at runtime
+RUN pip3.12 install mcp-atlassian
 
 # Non-root user (Claude Code rejects root)
 RUN useradd -m -s /bin/bash botuser

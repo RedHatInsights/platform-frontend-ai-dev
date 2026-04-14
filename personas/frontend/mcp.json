@@ -1,13 +1,12 @@
 {
   "mcpServers": {
     "hcc-patternfly-data-view": {
-      "command": "npx",
-      "args": ["@redhat-cloud-services/hcc-pf-mcp"]
+      "command": "hcc-pf-mcp",
+      "args": []
     },
     "chrome-devtools": {
-      "command": "npx",
+      "command": "chrome-devtools-mcp",
       "args": [
-        "chrome-devtools-mcp@latest",
         "--browserUrl", "http://127.0.0.1:9222",
         "--acceptInsecureCerts"
       ]

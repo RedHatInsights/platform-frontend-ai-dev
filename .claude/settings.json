@@ -63,14 +63,18 @@
     ]
   },
   "sandbox": {
-    "enabled": false,
+    "enabled": true,
     "autoAllow": true,
-    "allowUnsandboxedCommands": true,
-    "failIfUnavailable": false,
+    "allowUnsandboxedCommands": false,
+    "failIfUnavailable": true,
     "filesystem": {
       "allowWrite": [
         "./repos",
-        "./data"
+        "./data",
+        "/tmp",
+        "~/.cache",
+        "~/.npm",
+        "~/.local"
       ],
       "denyRead": [
         "~/.ssh",
