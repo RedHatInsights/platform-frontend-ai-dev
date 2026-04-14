@@ -26,6 +26,9 @@ COPY --from=dashboard /app/memory-server/src/static/assets/ src/static/assets/
 
 RUN uv sync --frozen --no-dev
 
+# Pre-download the embedding model so startup doesn't need HuggingFace
+RUN uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
 EXPOSE 8080
 
 CMD ["uv", "run", "python", "-m", "src.server"]
