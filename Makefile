@@ -71,7 +71,7 @@ memory-reset: ## Wipe and reimport memory DB from data/memory-dump.sql
 	@echo "Reset and imported from data/memory-dump.sql"
 
 docker-up: ## Start full stack (postgres + memory server + bot)
-	docker compose up
+	docker compose up --build
 
 docker-down: ## Stop full stack
 	docker compose down

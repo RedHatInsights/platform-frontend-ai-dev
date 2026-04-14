@@ -7,7 +7,6 @@ RUN dnf install -y --nodocs --allowerasing \
     openssh-clients \
     curl \
     jq \
-    bubblewrap \
     socat \
     alsa-lib \
     atk \
@@ -55,6 +54,11 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/v1.51.0/downloads/glab_1.51.0_linux_${ARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin --strip-components=2 bin/glab
+
+# grype (container image vulnerability scanner)
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
+    && curl -fsSL "https://github.com/anchore/grype/releases/download/v0.87.0/grype_0.87.0_linux_${ARCH}.tar.gz" \
+    | tar -xz -C /usr/local/bin grype
 
 # uv
 RUN pip3.12 install uv
