@@ -38,41 +38,6 @@
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/validate-bash.sh",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scan-secrets.sh",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__mcp-atlassian__jira_add_comment",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scan-secrets.sh",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__mcp-atlassian__jira_update_issue",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scan-secrets.sh",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__mcp-atlassian__jira_create_issue",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scan-secrets.sh",
-            "timeout": 5
           }
         ]
       },
@@ -82,6 +47,15 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/block-secrets-read.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scan-secrets.sh",
             "timeout": 5
           }
         ]

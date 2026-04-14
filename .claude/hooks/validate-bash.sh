@@ -51,16 +51,20 @@ if echo "$COMMAND" | grep -qiE '(^|[\|;`&(]|\$\()\s*env\s*$'; then
   deny "env (without arguments) is blocked — environment may contain secrets."
 fi
 # Block reading known credential files
-if echo "$COMMAND" | grep -qiE '(cat|less|more|head|tail|bat|strings|xxd|od|hexdump)\s+.*(\.\benv\b|sa-key\.json|\.ssh/|\.gnupg/|\.aws/|\.kube/config|\.npmrc|\.pypirc)'; then
+if echo "$COMMAND" | grep -qiE '(cat|less|more|head|tail|bat|strings|xxd|od|hexdump|grep|awk|sed)\s+.*(\.\benv\b|sa-key\.json|\.ssh/|\.gnupg/|\.aws/|\.kube/config|\.npmrc|\.pypirc|\.config/gh/)'; then
   deny "Reading credential/secret files is blocked."
+fi
+# Block python open() on credential files
+if echo "$COMMAND" | grep -qiE 'python[23]?\s+.*-c\s+.*open\s*\(.*(\.\benv\b|sa-key\.json|\.ssh/|\.gnupg/|\.config/gh/|\.aws/)'; then
+  deny "Python file read of credential files is blocked."
 fi
 # Block echo/printf of secret env vars
 if echo "$COMMAND" | grep -qiE '(echo|printf)\s+.*\$\{?(JIRA_API_TOKEN|SSH_PRIVATE_KEY|GPG_PRIVATE_KEY|GH_TOKEN|GOOGLE_SA_KEY|ANTHROPIC_API_KEY)'; then
   deny "Echoing secret environment variables is blocked."
 fi
 # Block gh auth commands that expose the PAT or require interactive login
-if echo "$COMMAND" | grep -qiE 'gh\s+auth\s+(token|status\s+.*--show-token|refresh|login)'; then
-  deny "gh auth token/refresh/login is blocked — interactive auth not available in container."
+if echo "$COMMAND" | grep -qiE 'gh\s+auth\s+(token|status\s+.*(--show-token|-t)|refresh|login)'; then
+  deny "gh auth token/refresh/login/status-show-token is blocked."
 fi
 
 # --- DESTRUCTIVE OPERATIONS ---
