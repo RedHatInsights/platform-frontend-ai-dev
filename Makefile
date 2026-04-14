@@ -1,6 +1,7 @@
 .PHONY: install run init dashboard costs costs-today costs-week seed-costs stop logs help memory-server memory-server-stop memory-dump memory-import memory-reset
 
 LABEL ?= hcc-ai-framework
+COMPOSE := $(shell command -v podman 2>/dev/null && echo "podman compose" || echo "docker compose")
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -48,26 +49,26 @@ seed-costs: ## Import costs.jsonl into the database
 	uv run python scripts/seed-costs.py data/costs.jsonl
 
 memory-server: ## Start memory server + postgres
-	docker compose -f memory-server/docker-compose.yml up --build
+	$(COMPOSE) -f memory-server/docker-compose.yml up --build
 
 memory-server-stop: ## Stop memory server + postgres
-	docker compose -f memory-server/docker-compose.yml down
+	$(COMPOSE) -f memory-server/docker-compose.yml down
 
 memory-dump: ## Dump memory DB to data/memory-dump.sql
-	docker compose -f memory-server/docker-compose.yml exec -T postgres pg_dump -U bot --data-only --inserts --on-conflict-do-nothing bot_memory > data/memory-dump.sql
+	$(COMPOSE) -f memory-server/docker-compose.yml exec -T postgres pg_dump -U bot --data-only --inserts --on-conflict-do-nothing bot_memory > data/memory-dump.sql
 	@echo "Dumped to data/memory-dump.sql"
 
 memory-import: ## Import data from data/memory-dump.sql (additive, skips duplicates)
-	docker compose -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory < data/memory-dump.sql
+	$(COMPOSE) -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory < data/memory-dump.sql
 	@echo "Imported from data/memory-dump.sql"
 
 memory-reset: ## Wipe and reimport memory DB from data/memory-dump.sql
-	docker compose -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory -c "DELETE FROM bot_status; DELETE FROM cycles; DELETE FROM memories; DELETE FROM tasks;" && \
-	docker compose -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory < data/memory-dump.sql
+	$(COMPOSE) -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory -c "DELETE FROM bot_status; DELETE FROM cycles; DELETE FROM memories; DELETE FROM tasks;" && \
+	$(COMPOSE) -f memory-server/docker-compose.yml exec -T postgres psql -U bot -d bot_memory < data/memory-dump.sql
 	@echo "Reset and imported from data/memory-dump.sql"
 
 docker-up: ## Start full stack (postgres + memory server + bot)
-	docker compose up
+	$(COMPOSE) up
 
 docker-down: ## Stop full stack
-	docker compose down
+	$(COMPOSE) down

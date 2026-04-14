@@ -42,7 +42,8 @@ fi
 # Start memory server
 log "Starting memory server..."
 cd "$SCRIPT_DIR/memory-server"
-docker compose up -d --build
+COMPOSE=$(command -v podman 2>/dev/null && echo "podman compose" || echo "docker compose")
+$COMPOSE up -d --build
 log "Waiting for memory server health check..."
 for i in $(seq 1 30); do
   if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
