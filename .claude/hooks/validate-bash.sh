@@ -58,6 +58,10 @@ fi
 if echo "$COMMAND" | grep -qiE '(echo|printf)\s+.*\$\{?(JIRA_API_TOKEN|SSH_PRIVATE_KEY|GPG_PRIVATE_KEY|GH_TOKEN|GOOGLE_SA_KEY|ANTHROPIC_API_KEY)'; then
   deny "Echoing secret environment variables is blocked."
 fi
+# Block gh auth commands that expose the PAT or require interactive login
+if echo "$COMMAND" | grep -qiE 'gh\s+auth\s+(token|status\s+.*--show-token|refresh|login)'; then
+  deny "gh auth token/refresh/login is blocked — interactive auth not available in container."
+fi
 
 # --- DESTRUCTIVE OPERATIONS ---
 if echo "$COMMAND" | grep -qiE '(^|[\|;`&(]|\$\()\s*sudo\b'; then
