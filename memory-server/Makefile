@@ -1,5 +1,7 @@
 .PHONY: install sync lock run dev up down logs clean seed
 
+CONTAINER_RT ?= $(shell command -v docker 2>/dev/null && echo docker || echo podman)
+
 install:
 	uv sync
 
@@ -17,19 +19,19 @@ dev: up
 
 # Docker
 up:
-	docker compose up -d postgres
+	$(CONTAINER_RT) compose up -d postgres
 	@echo "Waiting for postgres..."
-	@until docker compose exec postgres pg_isready -U bot -d bot_memory > /dev/null 2>&1; do sleep 1; done
+	@until $(CONTAINER_RT) compose exec postgres pg_isready -U bot -d bot_memory > /dev/null 2>&1; do sleep 1; done
 	@echo "Postgres ready"
 
 down:
-	docker compose down
+	$(CONTAINER_RT) compose down
 
 logs:
-	docker compose logs -f
+	$(CONTAINER_RT) compose logs -f
 
 clean:
-	docker compose down -v
+	$(CONTAINER_RT) compose down -v
 
 # Seed from open-prs.json
 seed:
@@ -37,7 +39,7 @@ seed:
 
 # Full stack in Docker
 up-all:
-	docker compose up -d --build
+	$(CONTAINER_RT) compose up -d --build
 
 down-all:
-	docker compose down
+	$(CONTAINER_RT) compose down
