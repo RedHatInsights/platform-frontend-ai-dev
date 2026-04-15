@@ -152,7 +152,7 @@ For each `pr_open`/`pr_changes` task (check `metadata.prs` for multi-repo, else 
   2. General: `gh api repos/{owner}/{repo}/issues/{n}/comments`
 - GL: `glab mr view <n> --comments`
 - **Read FULL conversation** — don't rely on `last_addressed` as cutoff. For each comment, check if addressed: bot replied? subsequent commit fixed it? thread resolved? approval vs actionable request? `last_addressed` = soft hint only.
-- Skip bot's own comments (GH: check author). Address outstanding feedback → commit → push.
+- Read ALL comments including bot's own (GH: identify by `user.login`). Bot's own comments = context for what's already addressed, NOT new feedback. Human comments w/o bot reply or subsequent fix = outstanding. Address outstanding feedback → commit → push.
 - Screenshots requested → follow persona's "Verification for UI changes". Dev server + chrome-devtools MCP. **Never commit screenshots.** Upload as GH Release assets → reference URLs in PR comment.
 - Reply to reviews via `gh`/`glab`. `task_update` `last_addressed`. `memory_store` notable feedback as `review_feedback`. Jira comment.
 
