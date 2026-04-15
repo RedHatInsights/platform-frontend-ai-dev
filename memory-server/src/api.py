@@ -42,8 +42,29 @@ async def api_tasks(request: Request) -> JSONResponse:
             "SELECT * FROM tasks ORDER BY created_at DESC LIMIT $1 OFFSET $2",
             limit, offset,
         )
+
+    # Fetch latest Slack notification per task
+    jira_keys = [r["jira_key"] for r in rows]
+    notifications = {}
+    if jira_keys:
+        notif_rows = await pool.fetch(
+            """
+            SELECT DISTINCT ON (jira_key) jira_key, event_type, message, sent_at
+            FROM slack_notifications
+            WHERE jira_key = ANY($1)
+            ORDER BY jira_key, sent_at DESC
+            """,
+            jira_keys,
+        )
+        for nr in notif_rows:
+            notifications[nr["jira_key"]] = {
+                "event_type": nr["event_type"],
+                "message": nr["message"],
+                "sent_at": nr["sent_at"].isoformat(),
+            }
+
     return JSONResponse({
-        "items": [_task(r) for r in rows],
+        "items": [_task(r, notifications.get(r["jira_key"])) for r in rows],
         "total": total,
         "limit": limit,
         "offset": offset,
@@ -586,8 +607,8 @@ async def api_stats(request: Request) -> JSONResponse:
     })
 
 
-def _task(row) -> dict:
-    return {
+def _task(row, slack_notif=None) -> dict:
+    result = {
         "id": row["id"],
         "jira_key": row["jira_key"],
         "status": row["status"],
@@ -602,6 +623,9 @@ def _task(row) -> dict:
         "paused_reason": row["paused_reason"],
         "metadata": json.loads(row["metadata"]) if isinstance(row["metadata"], str) else (row["metadata"] or {}),
     }
+    if slack_notif:
+        result["slack_notification"] = slack_notif
+    return result
 
 
 def _cycle(row) -> dict:

@@ -1,3 +1,9 @@
+export interface SlackNotification {
+  event_type: string;
+  message: string;
+  sent_at: string;
+}
+
 export interface Task {
   id: number;
   jira_key: string;
@@ -12,6 +18,7 @@ export interface Task {
   last_addressed: string;
   paused_reason: string | null;
   metadata: Record<string, any>;
+  slack_notification?: SlackNotification;
 }
 
 export interface Memory {

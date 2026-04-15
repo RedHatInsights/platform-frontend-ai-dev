@@ -65,6 +65,13 @@ export default function TaskCard({ task, selected, onClick }: Props) {
       {task.paused_reason && (
         <div className="task-paused-reason">{task.paused_reason}</div>
       )}
+      {task.slack_notification && (
+        <div className="task-slack-notif" title={`${task.slack_notification.event_type}: ${task.slack_notification.message}`}>
+          <span className="slack-icon">🔔</span>
+          <span className="slack-event">{task.slack_notification.event_type.replace(/_/g, ' ')}</span>
+          <span className="slack-time">{timeAgo(task.slack_notification.sent_at)}</span>
+        </div>
+      )}
     </div>
   );
 }

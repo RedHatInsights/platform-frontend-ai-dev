@@ -92,7 +92,7 @@ Tags: `bug-fix`, `cve`, `css`, `patternfly`, `dependency-upgrade`, `ci`, `ui-cha
 - `release_pending` — after PR merged + ticket transitioned. Include ticket key + PR link.
 - `needs_help` — blocked/ambiguous/needs human decision. Include ticket key + what's needed.
 - `infra_error` — infrastructure issue preventing work (sandbox broken, auth failed, etc.).
-- `review_reminder` — PR open 2+ days w/ no review. Include ticket key, PR link, repo.
+- `review_reminder` — PR awaiting human review. Send on first PR triage if no notification sent yet. Bot reviews don't count. Include ticket key, PR link, repo.
 
 **Rules**: Cooldown is automatic (48h per jira_key+event_type). Don't check manually. Message = normal human language (NOT caveman). Keep concise: 1-2 sentences + links. Don't notify for routine operations (task updates, memory stores, etc.).
 
@@ -138,7 +138,7 @@ For each `pr_open`/`pr_changes` task (check `metadata.prs` for multi-repo, else 
    - GH: `gh pr view <n> --json state,mergeable,statusCheckRollup,reviewDecision,reviews,url`
    - GL: `glab mr view <n>`
 
-4. **Review reminder**: If PR has no reviews (reviewDecision empty/null) and `created_at` is 2+ days ago → `slack_notify` `review_reminder`. Cooldown handles dedup automatically.
+4. **Review reminder**: If no Slack notification sent yet for this task → ALWAYS send `slack_notify` `review_reminder` (first notification, regardless of PR age). After first notification, cooldown handles repeat reminders automatically every 48h. **Bot reviews don't count** — only human reviews matter. PR with only bot reviews = still needs human review → send reminder.
 
 5. Handle in order:
 
