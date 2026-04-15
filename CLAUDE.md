@@ -79,6 +79,23 @@ Active: `in_progress`, `pr_open`, `pr_changes`. Terminal: `done`, `archived`, `p
 Categories: `learning`, `review_feedback`, `codebase_pattern`.
 Tags: `bug-fix`, `cve`, `css`, `patternfly`, `dependency-upgrade`, `ci`, `ui-change`, `testing`, etc.
 
+### Slack Notifications
+
+| Tool | Purpose |
+|------|---------|
+| `slack_notify` | Post to team Slack. Params: `jira_key, event_type, message`. 48h cooldown per key+event. |
+
+**Event types**: `pr_created`, `release_pending`, `needs_help`, `infra_error`, `review_reminder`.
+
+**When to notify**:
+- `pr_created` — after opening PR. Include ticket key, PR link, 1-line summary.
+- `release_pending` — after PR merged + ticket transitioned. Include ticket key + PR link.
+- `needs_help` — blocked/ambiguous/needs human decision. Include ticket key + what's needed.
+- `infra_error` — infrastructure issue preventing work (sandbox broken, auth failed, etc.).
+- `review_reminder` — PR open 2+ days w/ no review. Include ticket key, PR link, repo.
+
+**Rules**: Cooldown is automatic (48h per jira_key+event_type). Don't check manually. Message = normal human language (NOT caveman). Keep concise: 1-2 sentences + links. Don't notify for routine operations (task updates, memory stores, etc.).
+
 ## Workflow Loop
 
 ONE item per cycle. Priority order:
@@ -121,7 +138,9 @@ For each `pr_open`/`pr_changes` task (check `metadata.prs` for multi-repo, else 
    - GH: `gh pr view <n> --json state,mergeable,statusCheckRollup,reviewDecision,reviews,url`
    - GL: `glab mr view <n>`
 
-4. Handle in order:
+4. **Review reminder**: If PR has no reviews (reviewDecision empty/null) and `created_at` is 2+ days ago → `slack_notify` `review_reminder`. Cooldown handles dedup automatically.
+
+5. Handle in order:
 
 **Failing CI**: `gh pr checks <n>` / `glab ci view`. Checkout branch → fix → commit → push. Comment on Jira. `task_update` `last_addressed`.
 
@@ -151,8 +170,9 @@ For each `pr_open`/`pr_changes` task (check `metadata.prs` for multi-repo, else 
 - **Update linked issues**: duplicates → comment fix merged. Related → link PR. Blocked → blocker resolved.
 - **Delete bot branch**: GH: `gh api repos/{owner}/{repo}/git/refs/heads/bot/{KEY} -X DELETE`. GL: `glab api projects/:id/repository/branches/bot%2F{KEY} -X DELETE`. Local: `git branch -D bot/{KEY}`.
 - **Store learnings**: `memory_store` as `learning` + `codebase_pattern`. Set `repo` + `tags`.
+- `slack_notify` `release_pending`: "{KEY} merged → Release Pending. PR: {url}"
 
-**Unresolvable**: Jira comment explaining blocker. `task_update` `paused_reason`. Task stays tracked.
+**Unresolvable**: Jira comment explaining blocker. `task_update` `paused_reason`. `slack_notify` `needs_help`: "{KEY} blocked — {reason}". Task stays tracked.
 
 Handle one PR issue → stop. Next cycle picks up next.
 
@@ -303,6 +323,8 @@ Before starting work, `jira_get_issue` → check issue links:
     ```
 
 12. **Report on Jira**: `jira_transition_issue` → "Code Review". `jira_add_comment`: what done, PR links, concerns. Update linked issues w/ PR links (one comment per, only on PR open or completion).
+
+13. **Notify Slack**: `slack_notify` `pr_created`: "{KEY}: {title} — PR: {url}". Also notify `needs_help` if investigation or blocked.
 
 ## Progress Tracking
 

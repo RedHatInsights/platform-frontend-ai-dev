@@ -20,6 +20,8 @@ services:
       dockerfile: memory-server/Dockerfile
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://bot:bot@postgres:5432/bot_memory
     depends_on:

@@ -97,6 +97,14 @@ EXCEPTION
     WHEN duplicate_column THEN NULL;
 END $$;
 
+CREATE TABLE IF NOT EXISTS slack_notifications (
+    id              SERIAL PRIMARY KEY,
+    jira_key        TEXT NOT NULL,
+    event_type      TEXT NOT NULL,
+    message         TEXT NOT NULL,
+    sent_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Only create index if table has enough rows (ivfflat needs data)
 -- On first startup with empty table, queries fall back to sequential scan
 -- Re-run this after seeding data:
