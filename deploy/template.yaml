@@ -1,0 +1,202 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: platform-frontend-ai-dev
+parameters:
+- name: NAMESPACE
+  value: ${NAMESPACE}
+- name: BOT_IMAGE
+  value: quay.io/redhatinsights/platform-frontend-ai-dev-bot
+- name: BOT_IMAGE_TAG
+  value: latest
+- name: MEMORY_SERVER_IMAGE
+  value: quay.io/redhatinsights/platform-frontend-ai-dev-memory-server
+- name: MEMORY_SERVER_IMAGE_TAG
+  value: latest
+- name: BOT_LABEL
+  value: hcc-ai-framework
+- name: BOT_REPLICAS
+  value: "1"
+objects:
+
+# ============================================================================
+# Prerequisites
+#
+# 1. RDS instance with the pgvector extension enabled
+# 2. Secret "devbot-secrets" with the following keys:
+#      SSH_PRIVATE_KEY_B64    — base64-encoded SSH private key
+#      GPG_PRIVATE_KEY_B64   — base64-encoded GPG private key
+#      GH_TOKEN              — GitHub personal access token
+#      GOOGLE_SA_KEY_B64     — base64-encoded Google service account key
+#
+# Networking (Routes, NetworkPolicies) is managed via app-interface.
+#
+# ============================================================================
+
+# --- Memory Server Deployment ---
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: devbot-memory-server
+    labels:
+      app.kubernetes.io/name: memory-server
+      app.kubernetes.io/part-of: devbot
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: memory-server
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: memory-server
+          app.kubernetes.io/part-of: devbot
+      spec:
+        containers:
+        - name: memory-server
+          image: ${MEMORY_SERVER_IMAGE}:${MEMORY_SERVER_IMAGE_TAG}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          env:
+          - name: PGSQL_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: platform-frontend-ai-dev-rds
+                key: db.host
+          - name: PGSQL_PORT
+            valueFrom:
+              secretKeyRef:
+                name: platform-frontend-ai-dev-rds
+                key: db.port
+          - name: PGSQL_USER
+            valueFrom:
+              secretKeyRef:
+                name: platform-frontend-ai-dev-rds
+                key: db.user
+          - name: PGSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: platform-frontend-ai-dev-rds
+                key: db.password
+          - name: PGSQL_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: platform-frontend-ai-dev-rds
+                key: db.name
+          - name: PGSQL_SSLMODE
+            value: require
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+# --- Memory Server Service ---
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: devbot-memory-server
+    labels:
+      app.kubernetes.io/name: memory-server
+      app.kubernetes.io/part-of: devbot
+  spec:
+    type: ClusterIP
+    selector:
+      app.kubernetes.io/name: memory-server
+    ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+
+# --- Bot Deployment ---
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: devbot-bot
+    labels:
+      app.kubernetes.io/name: bot
+      app.kubernetes.io/part-of: devbot
+  spec:
+    replicas: ${{BOT_REPLICAS}}
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: bot
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: bot
+          app.kubernetes.io/part-of: devbot
+      spec:
+        containers:
+        - name: bot
+          image: ${BOT_IMAGE}:${BOT_IMAGE_TAG}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          env:
+          - name: BOT_LABEL
+            value: ${BOT_LABEL}
+          - name: BOT_MEMORY_URL
+            value: http://devbot-memory-server:8080/sse
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: /home/botuser/sa-key.json
+          # Secrets
+          - name: SSH_PRIVATE_KEY_B64
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: SSH_PRIVATE_KEY_B64
+          - name: GPG_PRIVATE_KEY_B64
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: GPG_PRIVATE_KEY_B64
+          - name: GH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: GH_TOKEN
+          - name: GOOGLE_SA_KEY_B64
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: GOOGLE_SA_KEY_B64
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi

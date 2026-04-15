@@ -7,9 +7,25 @@ from pgvector.asyncpg import register_vector
 _pool: asyncpg.Pool | None = None
 
 
+def _build_database_url() -> str:
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        return url
+    host = os.environ.get("PGSQL_HOSTNAME", "localhost")
+    port = os.environ.get("PGSQL_PORT", "5432")
+    user = os.environ["PGSQL_USER"]
+    password = os.environ["PGSQL_PASSWORD"]
+    database = os.environ["PGSQL_DATABASE"]
+    sslmode = os.environ.get("PGSQL_SSLMODE")
+    base = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+    if sslmode:
+        base += f"?sslmode={sslmode}"
+    return base
+
+
 async def init_pool() -> asyncpg.Pool:
     global _pool
-    url = os.environ.get("DATABASE_URL", "postgresql://bot:bot@localhost:5433/bot_memory")
+    url = _build_database_url()
 
     # First, run schema (creates the vector extension) using a direct connection
     conn = await asyncpg.connect(url)
