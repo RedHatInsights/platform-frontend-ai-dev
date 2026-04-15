@@ -87,6 +87,8 @@ def register_task_tools(mcp: FastMCP):
                 "Complete or pause existing tasks first."
             )
 
+        if isinstance(metadata, str):
+            metadata = json.loads(metadata)
         row = await pool.fetchrow(
             """
             INSERT INTO tasks (jira_key, status, repo, branch, pr_number, pr_url, title, summary, metadata)
@@ -153,6 +155,8 @@ def register_task_tools(mcp: FastMCP):
             sets.append(f"summary = ${idx}")
             params.append(summary)
         if metadata is not None:
+            if isinstance(metadata, str):
+                metadata = json.loads(metadata)
             idx += 1
             sets.append(f"metadata = metadata || ${idx}::jsonb")
             params.append(json.dumps(metadata))
