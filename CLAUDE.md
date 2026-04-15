@@ -203,6 +203,8 @@ project = RHCLOUD AND labels = PRIMARY_LABEL AND assignee is EMPTY AND status NO
 
 Find first ticket w/ `repo:` label matching `project-repos.json` key. Multiple `repo:` labels OK if all match. At capacity → only `needs-investigation`. No match → memory housekeeping → "NO_WORK_FOUND" → stop.
 
+**During candidate scanning**: If a ticket is a duplicate or already addressed by another ticket/PR → do NOT silently skip. MUST: `jira_add_comment` explaining which ticket/PR already addresses it → `jira_transition_issue` "Release Pending" → `jira_create_issue_link` (duplicates). Then move to next candidate. This keeps Jira clean and avoids re-scanning the same tickets.
+
 #### Memory Housekeeping (idle)
 
 ≤3-5 memories/cycle. `memory_list` limit=10 → `memory_search` each for duplicates (>80% similarity) → consolidate → `memory_store` merged + `memory_delete` originals.
