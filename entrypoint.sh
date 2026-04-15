@@ -8,7 +8,8 @@ chmod 600 ~/.ssh/id_ed25519
 
 # Import GPG key for commit signing
 gpg --batch --import <(echo "$GPG_PRIVATE_KEY_B64" | base64 -d) 2>/dev/null
-git config --global user.signingkey "$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep ed25519 | head -1 | awk '{print $2}' | cut -d/ -f2)"
+export GPG_SIGNING_KEY="$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep ed25519 | head -1 | awk '{print $2}' | cut -d/ -f2)"
+git config --global user.signingkey "$GPG_SIGNING_KEY"
 
 # Decode GCP service account key
 echo "$GOOGLE_SA_KEY_B64" | base64 -d > /home/botuser/sa-key.json
