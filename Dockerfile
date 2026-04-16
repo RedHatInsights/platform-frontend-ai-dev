@@ -45,6 +45,17 @@ RUN npx playwright install chromium
 RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 \
     && ln -sf /usr/bin/python3.12 /usr/bin/python
 
+# Go 1.24
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
+    && curl -fsSL "https://go.dev/dl/go1.24.2.linux-${ARCH}.tar.gz" \
+    | tar -xz -C /usr/local
+ENV PATH="/usr/local/go/bin:$PATH"
+
+# golangci-lint
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
+    && curl -fsSL "https://github.com/golangci/golangci-lint/releases/download/v2.1.6/golangci-lint-2.1.6-linux-${ARCH}.tar.gz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 --wildcards '*/golangci-lint'
+
 # gh CLI
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_linux_${ARCH}.tar.gz" \
@@ -90,7 +101,8 @@ WORKDIR /home/botuser/app
 COPY pyproject.toml uv.lock* ./
 COPY bot/ bot/
 RUN uv sync --frozen --no-dev
-ENV PATH="/home/botuser/app/.venv/bin:$PATH"
+ENV PATH="/home/botuser/app/.venv/bin:/home/botuser/go/bin:$PATH"
+ENV GOPATH="/home/botuser/go"
 ENV CLAUDE_CODE_USE_VERTEX=1
 ENV VERTEX_LOCATION=global
 
