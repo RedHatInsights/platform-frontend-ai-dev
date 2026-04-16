@@ -39,10 +39,12 @@ mcp = FastMCP(
 from .tools.tasks import register_task_tools
 from .tools.rag import register_rag_tools
 from .tools.slack import register_slack_tools
+from .tools.org_members import register_org_member_tools
 
 register_task_tools(mcp)
 register_rag_tools(mcp)
 register_slack_tools(mcp)
+register_org_member_tools(mcp)
 
 
 # Health check

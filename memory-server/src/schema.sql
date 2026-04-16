@@ -120,6 +120,15 @@ CREATE TABLE IF NOT EXISTS slack_notifications (
     sent_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS org_members (
+    id              SERIAL PRIMARY KEY,
+    username        TEXT NOT NULL,
+    org             TEXT NOT NULL,
+    is_member       BOOLEAN NOT NULL,
+    checked_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(username, org)
+);
+
 -- Only create index if table has enough rows (ivfflat needs data)
 -- On first startup with empty table, queries fall back to sequential scan
 -- Re-run this after seeding data:
