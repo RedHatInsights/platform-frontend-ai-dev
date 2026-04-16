@@ -24,6 +24,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://bot:bot@postgres:5432/bot_memory
+      TRUSTED_BOT_ACCOUNTS: "${TRUSTED_BOT_ACCOUNTS:-}"
     depends_on:
       postgres:
         condition: service_healthy
