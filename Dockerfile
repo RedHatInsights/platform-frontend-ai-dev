@@ -48,11 +48,23 @@ RUN npx playwright install chromium
 RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 \
     && ln -sf /usr/bin/python3.12 /usr/bin/python
 
-# Go 1.24
+# Go — multiple versions via GOVERSIONS build arg
+# Default Go is the first version listed. Bot switches with: eval "$(use-go 1.25.7)"
+ARG GOVERSIONS="1.24.2 1.25.7"
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
-    && curl -fsSL "https://go.dev/dl/go1.24.2.linux-${ARCH}.tar.gz" \
-    | tar -xz -C /usr/local
+    && for v in $GOVERSIONS; do \
+         echo "Installing Go $v..." \
+         && curl -fsSL "https://go.dev/dl/go${v}.linux-${ARCH}.tar.gz" \
+            | tar -xz -C /usr/local \
+         && mv /usr/local/go /usr/local/go${v}; \
+       done \
+    && DEFAULT=$(echo $GOVERSIONS | awk '{print $1}') \
+    && ln -s /usr/local/go${DEFAULT} /usr/local/go
 ENV PATH="/usr/local/go/bin:$PATH"
+
+# use-go helper: eval "$(use-go 1.25.7)"
+RUN printf '#!/bin/bash\nV=${1:?Usage: use-go <version>}\nif [ ! -d "/usr/local/go${V}" ]; then echo "Go $V not installed. Available:" >&2; ls -d /usr/local/go[0-9]* | sed "s|/usr/local/go||" >&2; exit 1; fi\necho "export PATH=/usr/local/go${V}/bin:\${PATH#/usr/local/go*/bin:}"\n' > /usr/local/bin/use-go \
+    && chmod +x /usr/local/bin/use-go
 
 # golangci-lint
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
