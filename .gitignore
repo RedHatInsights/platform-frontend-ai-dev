@@ -25,3 +25,4 @@ memory-server/src/static/style.css
 sa-key.json
 .ssh/
 .gitconfig
+.DS_STORE

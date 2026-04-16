@@ -54,6 +54,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GOVERSIONS: "1.24.2 1.25.7"
     security_opt:
       - no-new-privileges
     mem_limit: 8g

@@ -27,10 +27,22 @@ if [[ -z "$COMMAND" ]]; then
   exit 0
 fi
 
+# --- SHELL WRAPPING / EVAL ---
+# Block eval, bash -c, sh -c — these can wrap blocked commands to bypass detection.
+# Only exception: eval "$(use-go ...)" for Go version switching.
+if echo "$COMMAND" | grep -qiE '\beval\b' && ! echo "$COMMAND" | grep -qP '^\s*eval\s+"\$\(use-go\s+[\d.]+\)"$'; then
+  deny "eval is blocked except for 'eval \"\$(use-go <version>)\"'."
+fi
+if echo "$COMMAND" | grep -qiE '(^|[\|;`&(]|\$\()\s*(bash|sh|zsh|dash|ksh)\s+-c\b'; then
+  deny "Shell -c wrappers are blocked — they can bypass command filtering."
+fi
+
 # --- NETWORK EXFILTRATION ---
 # Block all network client tools. The bot should only make HTTP requests
 # via MCP tools (mcp-atlassian, chrome-devtools, bot-memory).
-if echo "$COMMAND" | grep -qiE '(^|[\|;`&(]|\$\()\s*(curl|wget|nc|ncat|netcat|socat|telnet|lynx|w3m|httpie|http)\b'; then
+# Match anywhere in the command — not just at word boundaries with specific prefixes.
+# This catches: eval "curl ...", bash -c "curl ...", `curl ...`, $cmd=curl; $cmd, etc.
+if echo "$COMMAND" | grep -qiE '\b(curl|wget|nc|ncat|netcat|socat|telnet|lynx|w3m|httpie)\b'; then
   deny "Network client commands (curl/wget/nc/etc.) are blocked. Use MCP tools for HTTP requests."
 fi
 
