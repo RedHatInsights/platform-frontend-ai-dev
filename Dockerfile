@@ -8,6 +8,9 @@ RUN dnf install -y --nodocs --allowerasing \
     curl \
     jq \
     socat \
+    gcc \
+    make \
+    sqlite-devel \
     alsa-lib \
     atk \
     at-spi2-atk \
@@ -67,7 +70,7 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     | tar -xz -C /usr/local/bin --strip-components=2 bin/glab
 
 # bubblewrap (sandbox runtime for Claude Code)
-RUN dnf install -y --nodocs gcc libcap-devel \
+RUN dnf install -y --nodocs libcap-devel \
     && pip3.12 install meson ninja \
     && git clone --depth 1 --branch v0.11.1 https://github.com/containers/bubblewrap.git /tmp/bwrap \
     && cd /tmp/bwrap \
@@ -76,7 +79,6 @@ RUN dnf install -y --nodocs gcc libcap-devel \
     && meson install -C _builddir \
     && cd / && rm -rf /tmp/bwrap \
     && pip3.12 uninstall -y meson ninja \
-    && dnf remove -y gcc \
     && dnf clean all
 
 # grype (container image vulnerability scanner)
