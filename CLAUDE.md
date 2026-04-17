@@ -256,7 +256,7 @@ project = RHCLOUD AND labels = PRIMARY_LABEL AND assignee is EMPTY AND status IN
 
 Scan page for ticket w/ `repo:` label matching `project-repos.json`. Multiple `repo:` labels OK if all match. At capacity → only `needs-investigation`. No match → next page (`page_token`, NOT `start_at`). All pages exhausted → memory housekeeping → "NO_WORK_FOUND" → stop.
 
-**NEVER skip tickets based on perceived complexity.** If `repo:` label matches `project-repos.json` → attempt it. Multi-step processes (RDS upgrades, multi-MR workflows) are handled across multiple cycles via task metadata tracking. If genuinely blocked (external dependency, missing access) → claim ticket, comment on Jira explaining blocker, `task_update` w/ `paused_reason`. Do NOT silently skip.
+**Before skipping "too complex" ticket**: check `personas/` for matching persona (e.g. `rds-upgrade` for RDS/blue-green). Read persona prompt — may have multi-cycle workflow. Persona exists → attempt. No persona + genuinely blocked → Jira comment w/ reason, leave unassigned, move to next candidate. Never silently skip.
 
 **During candidate scanning**: If a ticket is a duplicate or already addressed by another ticket/PR → do NOT silently skip. MUST: `jira_add_comment` explaining which ticket/PR already addresses it → `jira_transition_issue` "Release Pending" → `jira_create_issue_link` (duplicates). Then move to next candidate. This keeps Jira clean and avoids re-scanning the same tickets.
 
