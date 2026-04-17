@@ -6,12 +6,16 @@ parameters:
 - name: NAMESPACE
   value: ${NAMESPACE}
 - name: BOT_IMAGE
-  value: quay.io/redhatinsights/platform-frontend-ai-dev-bot
+  value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev-bot
 - name: BOT_IMAGE_TAG
   value: latest
 - name: MEMORY_SERVER_IMAGE
-  value: quay.io/redhatinsights/platform-frontend-ai-dev-memory-server
+  value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev-memory-server
 - name: MEMORY_SERVER_IMAGE_TAG
+  value: latest
+- name: PROXY_IMAGE
+  value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev-proxy
+- name: PROXY_IMAGE_TAG
   value: latest
 - name: BOT_LABEL
   value: hcc-ai-framework
@@ -136,6 +140,75 @@ objects:
       protocol: TCP
       name: http
 
+# --- Proxy Deployment ---
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: devbot-proxy
+    labels:
+      app.kubernetes.io/name: proxy
+      app.kubernetes.io/part-of: devbot
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: proxy
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: proxy
+          app.kubernetes.io/part-of: devbot
+      spec:
+        containers:
+        - name: proxy
+          image: ${PROXY_IMAGE}:${PROXY_IMAGE_TAG}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          ports:
+          - containerPort: 3128
+            name: squid
+            protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: 3128
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            tcpSocket:
+              port: 3128
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+# --- Proxy Service ---
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: devbot-proxy
+    labels:
+      app.kubernetes.io/name: proxy
+      app.kubernetes.io/part-of: devbot
+  spec:
+    type: ClusterIP
+    selector:
+      app.kubernetes.io/name: proxy
+    ports:
+    - port: 3128
+      targetPort: squid
+      protocol: TCP
+      name: squid
+
 # --- Bot Deployment ---
 - apiVersion: apps/v1
   kind: Deployment
@@ -172,6 +245,21 @@ objects:
             value: http://devbot-memory-server:8080/sse
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /home/botuser/sa-key.json
+          # Proxy — PROXY_HOST for SSH config, HTTP(S)_PROXY for HTTP clients
+          - name: PROXY_HOST
+            value: devbot-proxy
+          - name: HTTP_PROXY
+            value: http://devbot-proxy:3128
+          - name: HTTPS_PROXY
+            value: http://devbot-proxy:3128
+          - name: http_proxy
+            value: http://devbot-proxy:3128
+          - name: https_proxy
+            value: http://devbot-proxy:3128
+          - name: NO_PROXY
+            value: devbot-memory-server,localhost,127.0.0.1
+          - name: no_proxy
+            value: devbot-memory-server,localhost,127.0.0.1
           # Secrets
           - name: SSH_PRIVATE_KEY_B64
             valueFrom:

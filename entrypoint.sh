@@ -6,6 +6,24 @@ set -e
 echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
 chmod 600 ~/.ssh/id_ed25519
 
+# Generate SSH config — PROXY_HOST defaults to "proxy" (matches docker-compose service name)
+PROXY_HOST="${PROXY_HOST:-proxy}"
+cat > ~/.ssh/config <<SSHEOF
+Host github.com github.com-bot
+  HostName github.com
+  User git
+  IdentityFile /home/botuser/.ssh/id_ed25519
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+  ProxyCommand socat - PROXY:${PROXY_HOST}:%h:%p,proxyport=3128
+
+Host gitlab.cee.redhat.com
+  IdentityFile /home/botuser/.ssh/id_ed25519
+  StrictHostKeyChecking accept-new
+  ProxyCommand socat - PROXY:${PROXY_HOST}:%h:%p,proxyport=3128
+SSHEOF
+chmod 600 ~/.ssh/config
+
 # Import GPG key for commit signing
 gpg --batch --import <(echo "$GPG_PRIVATE_KEY_B64" | base64 -d) 2>/dev/null
 export GPG_SIGNING_KEY="$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep ed25519 | head -1 | awk '{print $2}' | cut -d/ -f2)"
