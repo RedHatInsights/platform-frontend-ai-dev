@@ -2,9 +2,15 @@
 # Bot container entrypoint — decode secrets, start Chromium, launch bot.
 set -e
 
-# Decode SSH key
-echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
-chmod 600 ~/.ssh/id_ed25519
+# Decode SSH keys (separate keys for GitHub and GitLab)
+echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/id_gh
+chmod 600 ~/.ssh/id_gh
+
+if [ -n "${GITLAB_SSH_KEY_B64:-}" ]; then
+    echo "$GITLAB_SSH_KEY_B64" | base64 -d > ~/.ssh/id_gl
+    chmod 600 ~/.ssh/id_gl
+    unset GITLAB_SSH_KEY_B64
+fi
 
 # Generate SSH config — PROXY_HOST defaults to "proxy" (matches docker-compose service name)
 PROXY_HOST="${PROXY_HOST:-proxy}"
@@ -12,13 +18,14 @@ cat > ~/.ssh/config <<SSHEOF
 Host github.com github.com-bot
   HostName github.com
   User git
-  IdentityFile /home/botuser/.ssh/id_ed25519
+  IdentityFile /home/botuser/.ssh/id_gh
   IdentitiesOnly yes
   StrictHostKeyChecking accept-new
   ProxyCommand socat - PROXY:${PROXY_HOST}:%h:%p,proxyport=3128
 
 Host gitlab.cee.redhat.com
-  IdentityFile /home/botuser/.ssh/id_ed25519
+  IdentityFile /home/botuser/.ssh/id_gl
+  IdentitiesOnly yes
   StrictHostKeyChecking accept-new
   ProxyCommand socat - PROXY:${PROXY_HOST}:%h:%p,proxyport=3128
 SSHEOF
@@ -46,6 +53,20 @@ EOF
 
 # Remove token from env — gh uses the config file from now on
 unset GH_TOKEN
+
+# Configure glab CLI auth (GitLab)
+if [ -n "${GITLAB_TOKEN:-}" ]; then
+    mkdir -p ~/.config/glab-cli
+    cat > ~/.config/glab-cli/config.yml <<EOF
+git_protocol: ssh
+hosts:
+    gitlab.cee.redhat.com:
+        token: ${GITLAB_TOKEN}
+        api_host: gitlab.cee.redhat.com
+        git_protocol: ssh
+EOF
+    unset GITLAB_TOKEN
+fi
 
 # Start headless Chromium in background (Playwright-installed binary)
 CHROME_BIN=$(find "$PLAYWRIGHT_BROWSERS_PATH" -name chrome -type f | head -1)

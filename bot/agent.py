@@ -8,6 +8,7 @@ import httpx
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
+    HookMatcher,
     ResultMessage,
     SystemMessage,
     TextBlock,
@@ -17,6 +18,9 @@ from claude_agent_sdk import (
 from .config import Config
 
 logger = logging.getLogger(__name__)
+
+TURN_WARNING_THRESHOLD = 0.75  # warn at 75% of max_turns
+TURN_CRITICAL_THRESHOLD = 0.90  # urgent at 90%
 
 DASHBOARD_URL = os.environ.get("BOT_DASHBOARD_URL", "http://localhost:8080/api/bot-status")
 
@@ -86,6 +90,47 @@ def _describe_tool_use(block) -> str:
         return name
 
 
+def _make_turn_budget_hook(max_turns: int):
+    """Create a PostToolUse hook that injects turn budget warnings."""
+    turn_count = {"n": 0, "warned": False, "critical": False}
+    warn_at = int(max_turns * TURN_WARNING_THRESHOLD)
+    critical_at = int(max_turns * TURN_CRITICAL_THRESHOLD)
+
+    async def hook(input_data, tool_use_id, context):
+        turn_count["n"] += 1
+        n = turn_count["n"]
+
+        if n >= critical_at and not turn_count["critical"]:
+            turn_count["critical"] = True
+            remaining = max_turns - n
+            logger.warning("Turn budget critical: %d/%d used", n, max_turns)
+            return {
+                "systemMessage": (
+                    f"TURN BUDGET CRITICAL: ~{n}/{max_turns} tool calls used, "
+                    f"~{remaining} remaining. You MUST save progress NOW via "
+                    "task_update with current summary, last_step, files_changed, "
+                    "and next_step. Then wrap up or stop."
+                ),
+            }
+
+        if n >= warn_at and not turn_count["warned"]:
+            turn_count["warned"] = True
+            remaining = max_turns - n
+            logger.info("Turn budget warning: %d/%d used", n, max_turns)
+            return {
+                "systemMessage": (
+                    f"TURN BUDGET WARNING: ~{n}/{max_turns} tool calls used, "
+                    f"~{remaining} remaining. Save progress via task_update soon "
+                    "(summary + metadata with last_step, files_changed, next_step). "
+                    "Prioritize completing current step and saving state."
+                ),
+            }
+
+        return {}
+
+    return hook
+
+
 async def run_cycle(
     label: str,
     config: Config,
@@ -95,6 +140,7 @@ async def run_cycle(
     instance_id: str | None = None,
 ) -> tuple[ResultMessage | None, CycleContext]:
     """Run a single bot cycle via the Claude Agent SDK."""
+    turn_hook = _make_turn_budget_hook(config.max_turns)
     options = ClaudeAgentOptions(
         model=config.model,
         max_turns=config.max_turns,
@@ -103,6 +149,9 @@ async def run_cycle(
         setting_sources=["project"],
         cwd=cwd,
         permission_mode="acceptEdits",
+        hooks={
+            "PostToolUse": [HookMatcher(hooks=[turn_hook])],
+        },
     )
 
     instance_line = f" Your instance ID is: {instance_id}. Pass instance_id=\"{instance_id}\" to ALL task tool calls (task_list, task_add, task_update, task_check_capacity, bot_status_update)." if instance_id else ""

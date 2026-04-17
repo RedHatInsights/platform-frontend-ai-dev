@@ -66,8 +66,10 @@ services:
       - .env
     environment:
       - SSH_PRIVATE_KEY_B64
+      - GITLAB_SSH_KEY_B64
       - GPG_PRIVATE_KEY_B64
       - GH_TOKEN
+      - GITLAB_TOKEN
       - GOOGLE_SA_KEY_B64
       - BOT_LABEL=${BOT_LABEL:-hcc-ai-framework}
       - BOT_INSTANCE_ID=${BOT_INSTANCE_ID:-}
