@@ -93,6 +93,10 @@ RUN dnf install -y --nodocs libcap-devel \
     && pip3.12 uninstall -y meson ninja \
     && dnf clean all
 
+# Buildah (rootless container image builder — no daemon, works in OpenShift)
+RUN dnf install -y --nodocs buildah fuse-overlayfs \
+    && dnf clean all
+
 # grype (container image vulnerability scanner)
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://github.com/anchore/grype/releases/download/v0.87.0/grype_0.87.0_linux_${ARCH}.tar.gz" \
@@ -119,6 +123,7 @@ ENV PATH="/home/botuser/app/.venv/bin:/home/botuser/go/bin:$PATH"
 ENV GOPATH="/home/botuser/go"
 ENV CLAUDE_CODE_USE_VERTEX=1
 ENV VERTEX_LOCATION=global
+ENV BUILDAH_ISOLATION=chroot
 
 # Copy bot config files
 COPY config.json project-repos.json CLAUDE.md .mcp.json entrypoint.sh ./
@@ -129,6 +134,12 @@ COPY personas/ personas/
 RUN chown -R botuser:botuser /home/botuser/app
 
 USER botuser
+
+# Buildah rootless config — vfs driver (no kernel module needed, works everywhere)
+RUN mkdir -p /home/botuser/.config/containers /home/botuser/.local/share/containers \
+    && echo -e '[storage]\ndriver = "vfs"' > /home/botuser/.config/containers/storage.conf \
+    && echo -e '[registries.search]\nregistries = ["registry.access.redhat.com", "quay.io", "docker.io"]' \
+       > /home/botuser/.config/containers/registries.conf
 
 # SSH directory — config is generated at runtime by entrypoint.sh
 RUN mkdir -p /home/botuser/.ssh && chmod 700 /home/botuser/.ssh

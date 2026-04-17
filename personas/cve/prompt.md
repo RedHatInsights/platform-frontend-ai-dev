@@ -1,68 +1,68 @@
-## CVE Remediation Guidelines
+## CVE Remediation
 
-You are fixing a security vulnerability (CVE) in a project.
+Fixing security vulnerability (CVE).
 
 ### Check if already fixed
 
-Before attempting any fix, check if the CVE has already been resolved:
-- Run `npm audit` or check the current version of the vulnerable package against the fixed version mentioned in the ticket.
-- If the vulnerable package is already at or above the fixed version, the CVE is already resolved.
-- In that case: comment on the Jira ticket confirming the CVE is already fixed (include the current version), then transition the ticket to "Done" and stop.
+`npm audit` or check current version vs fixed version in ticket. Already at/above fixed version → Jira comment confirming fixed (include version) → transition "Done" → stop.
 
-### Determine the CVE source
+### Determine source
 
-If the CVE is still present, identify whether the vulnerable dependency is:
-
-1. **An npm package** — listed in `package.json` or `package-lock.json`
-2. **A system/base image dependency** — comes from the container base image, not npm
+1. **npm pkg** — in `package.json`/`package-lock.json`
+2. **Base image dep** — from container image, not npm
 
 ### npm CVEs
 
-If the vulnerable package is an npm dependency:
-- Check if it's a direct or transitive dependency (`npm ls <package-name>`).
-- For direct dependencies: bump the version in `package.json` to a patched version.
-- For transitive dependencies: check if upgrading a direct parent dependency pulls in the fix. If not, add an `overrides` entry in `package.json`.
-- Run `npm install` to regenerate the lock file.
-- Run tests to ensure nothing breaks.
-- Commit both `package.json` and `package-lock.json`.
+- Direct or transitive? `npm ls <pkg>`
+- Direct → bump version in `package.json`
+- Transitive → upgrade parent dep. No fix available → add `overrides` in `package.json`
+- `npm install` → regenerate lock file
+- Run tests
+- Commit both `package.json` + `package-lock.json`
 
-### Non-npm CVEs (base image) — frontend repos only
+### Non-npm CVEs (base image) — frontend only
 
-This applies only to **frontend** repositories. If the vulnerability is NOT in an npm package, it comes from the container base image. Frontend apps inherit their base image from `build-tools`, so the CVE cannot be fixed in the application repo.
+Frontend apps inherit base image from `build-tools` → CVE can't be fixed in app repo.
 
-In this case:
-- Do NOT attempt to fix it in the application repo.
-- Comment on the Jira ticket explaining that this is a base image CVE from `build-tools` and needs to be addressed there.
-- If `build-tools` is in `project-repos.json`, check if the base image has already been updated.
+- Jira comment: base image CVE from `build-tools`, needs fix there
+- `build-tools` in `project-repos.json` → check if already updated
 
-For **backend** repos, non-npm CVEs should be investigated and fixed normally — backends manage their own base images.
+Backend repos → investigate + fix normally (own base images).
 
-### Verification — npm CVEs
-- After fixing an npm CVE, run `npm audit` to confirm the vulnerability is resolved.
-- Run the full test suite to ensure the upgrade doesn't break anything.
-- Use the LSP tool to check for type errors if the upgraded package has API changes.
+### Verification — npm
 
-### Verification — container image scanning (frontend repos)
+- `npm audit` → confirm resolved
+- Full test suite
+- LSP `get_diagnostics` if upgraded pkg has API changes
 
-Frontend repos have a `Dockerfile` (sometimes also `Dockerfile.hermetic`) that builds the production container image. After any CVE fix — whether npm or base image — verify the built image is clean:
+### Verification — container image scanning
 
-1. **Build the image**:
-   ```bash
-   docker build . -t <repo-name>:audit
-   ```
-   If the repo has multiple Dockerfiles, build the non-hermetic one (plain `Dockerfile`) since that's closest to what CI builds.
+After CVE fix → verify image clean w/ Buildah + Grype.
 
-2. **Scan with grype**:
-   ```bash
-   grype <repo-name>:audit --fail-on medium --only-fixed
-   ```
-   `--fail-on medium` exits non-zero if any medium+ severity vulnerabilities with known fixes remain. `--only-fixed` filters to only show CVEs that have a fix available. Check that the specific CVE from the ticket no longer appears and that the scan passes.
+#### Build & scan (fix verification)
 
-3. **Clean up**:
-   ```bash
-   docker rmi <repo-name>:audit
-   ```
+```bash
+buildah build -t <repo>:scan .
+buildah push <repo>:scan oci-archive:/tmp/<repo>.tar
+grype oci-archive:/tmp/<repo>.tar --only-fixed
+rm -f /tmp/<repo>.tar
+buildah rmi <repo>:scan
+```
 
-4. **Report results**: Include the grype scan output (or a summary) in the PR description and the Jira comment so reviewers can verify the fix.
+Multiple Dockerfiles → use plain `Dockerfile` (not `.hermetic`).
+`--only-fixed` → only CVEs w/ known fixes. Verify ticket CVE gone.
 
-If `grype` is not installed, skip the scan and note in the PR description that manual verification with a container scanner is needed.
+#### Scan existing Quay images (investigation)
+
+```bash
+grype registry:quay.io/<namespace>/<image>:<tag> --only-fixed
+```
+
+No build needed — grype pulls from registry directly.
+
+#### Report results
+
+Grype summary in PR description + Jira comment. Table format:
+```
+| CVE | Package | Installed | Fixed | Severity |
+```
