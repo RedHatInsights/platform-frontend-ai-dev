@@ -332,6 +332,7 @@ Before starting work, `jira_get_issue` → check issue links:
    - Dockerfiles/scripts/Caddyfiles → `tooling`
    - Config/YAML repo → `config`
    - CVE ticket → also `cve` (layered on base)
+   - RDS EOL / blue-green upgrade ticket → also `rds-upgrade` (layered on `config`)
    - Read `personas/<name>/prompt.md`. Multi-repo → load ALL.
    - Persona scoping: frontend rules only in frontend repos, etc.
    - Cross-repo: plan holistically, dep order (upstream first), reference in commits/PR.
