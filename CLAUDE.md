@@ -169,8 +169,8 @@ ONE item per cycle. Priority order:
 
 Triage buckets (first match wins):
 
-1. **Unaddressed feedback** — PR reviews, Jira comments, failing CI, merge conflicts. Highest priority. Includes investigation follow-ups.
-2. **Interrupted work** — `in_progress` w/ `last_step` set, no PR yet. Resume.
+1. **Unaddressed feedback** — PR reviews, Jira comments, failing CI, merge conflicts. Highest priority. Includes investigation follow-ups. **Before acting**: reload `personas/<name>/prompt.md` for repo. Has CI fix patterns + sequencing rules.
+2. **Interrupted work** — `in_progress` w/ `last_step` set, no PR yet. Reload persona → resume.
 3. **Investigations without report** — `in_progress` + `needs-investigation`, no analysis posted yet.
 4. **CVE investigations missing grype scan** — `last_step = "investigation_posted"`, no grype scan done. Build Dockerfile + scan per CVE persona.
 5. **Failed retryable tasks** — `last_step` = `clone_failed`/`push_failed`/`ci_failed`. Retry once. Same error → `paused_reason`, move on.
@@ -181,6 +181,7 @@ None apply → Priority 1.
 
 For each `pr_open`/`pr_changes` task (check `metadata.prs` for multi-repo, else `repo`/`pr_number`/`pr_url`):
 
+0. **Reload persona**: Read `personas/<name>/prompt.md` for repo tech stack (same logic as step 6). Has CI fix patterns + sequencing rules.
 1. `cd` repo dir. `git fetch origin`. Fork? Also `git fetch upstream`.
 2. Check `host` in `project-repos.json` → `gh` (GitHub) or `glab` (GitLab). Fork repos: `glab mr` needs `--repo <upstream-project-path>`.
 3. PR status:
