@@ -31,6 +31,15 @@ Host gitlab.cee.redhat.com
 SSHEOF
 chmod 600 ~/.ssh/config
 
+# Write SSO credentials file for stage auth (chrome-devtools)
+if [ -n "${SSO_USERNAME:-}" ] && [ -n "${SSO_PASSWORD:-}" ]; then
+    cat > /home/botuser/app/.credentials <<EOF
+{"sso": {"username": "${SSO_USERNAME}", "password": "${SSO_PASSWORD}"}}
+EOF
+    chmod 600 /home/botuser/app/.credentials
+    unset SSO_USERNAME SSO_PASSWORD
+fi
+
 # Import GPG key for commit signing
 gpg --batch --import <(echo "$GPG_PRIVATE_KEY_B64" | base64 -d) 2>/dev/null
 export GPG_SIGNING_KEY="$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep ed25519 | head -1 | awk '{print $2}' | cut -d/ -f2)"

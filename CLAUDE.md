@@ -314,7 +314,7 @@ Before starting work, `jira_get_issue` → check issue links:
 
    Dir = `./repos/<repo-name>/` (from upstream URL basename, no `.git`).
 
-   **Clone on demand**: Not exists → `git clone <url> ./repos/<name>/`. Has upstream → `git remote add upstream <upstream-url>`. Clone fails → Jira comment, stop.
+   **Clone on demand**: Not exists → `git clone --depth 1 <url> ./repos/<name>/`. Has upstream → `git remote add upstream <upstream-url>`. Clone fails → Jira comment, stop. Start shallow (`--depth 1`), deepen incrementally if needed (`git fetch --deepen=50`). Never clone full history upfront.
 
    **Verify remotes**: Exists → `git remote -v`. Origin must match `url`. Upstream remote must match `upstream` field. Fix w/ `set-url`/`add` as needed.
 

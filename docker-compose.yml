@@ -71,6 +71,8 @@ services:
       - GH_TOKEN
       - GITLAB_TOKEN
       - GOOGLE_SA_KEY_B64
+      - SSO_USERNAME
+      - SSO_PASSWORD
       - BOT_LABEL=${BOT_LABEL:-hcc-ai-framework}
       - BOT_INSTANCE_ID=${BOT_INSTANCE_ID:-}
       - BOT_MEMORY_URL=http://memory-server:8080/sse
