@@ -15,7 +15,7 @@ fi
 # Generate SSH config — PROXY_HOST defaults to "proxy" (matches docker-compose service name)
 PROXY_HOST="${PROXY_HOST:-proxy}"
 cat > ~/.ssh/config <<SSHEOF
-Host github.com github.com-bot
+Host github.com
   HostName github.com
   User git
   IdentityFile /home/botuser/.ssh/id_gh
