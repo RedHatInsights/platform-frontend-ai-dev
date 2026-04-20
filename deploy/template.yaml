@@ -260,27 +260,32 @@ objects:
             value: devbot-memory-server,localhost,127.0.0.1
           - name: no_proxy
             value: devbot-memory-server,localhost,127.0.0.1
-          # Secrets
+          # Secrets — optional: true until devbot-secrets is provisioned via
+          # Vault in a follow-up PR (chicken-and-egg with SaaS dry-run)
           - name: SSH_PRIVATE_KEY_B64
             valueFrom:
               secretKeyRef:
                 name: devbot-secrets
                 key: SSH_PRIVATE_KEY_B64
+                optional: true
           - name: GPG_PRIVATE_KEY_B64
             valueFrom:
               secretKeyRef:
                 name: devbot-secrets
                 key: GPG_PRIVATE_KEY_B64
+                optional: true
           - name: GH_TOKEN
             valueFrom:
               secretKeyRef:
                 name: devbot-secrets
                 key: GH_TOKEN
+                optional: true
           - name: GOOGLE_SA_KEY_B64
             valueFrom:
               secretKeyRef:
                 name: devbot-secrets
                 key: GOOGLE_SA_KEY_B64
+                optional: true
           resources:
             requests:
               cpu: "1"
