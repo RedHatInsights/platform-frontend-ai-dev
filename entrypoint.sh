@@ -82,6 +82,7 @@ CHROME_BIN=$(find "$PLAYWRIGHT_BROWSERS_PATH" -name chrome -type f | head -1)
 "$CHROME_BIN" \
     --headless --no-sandbox --disable-gpu \
     --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 \
+    --remote-allow-origins=* \
     --ignore-certificate-errors \
     --host-resolver-rules='MAP consent.trustarc.com 127.0.0.1' \
     --no-first-run --disable-sync --disable-extensions --disable-popup-blocking &

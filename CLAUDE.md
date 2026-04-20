@@ -169,8 +169,8 @@ ONE item per cycle. Priority order:
 
 Triage buckets (first match wins):
 
-1. **Unaddressed feedback** — PR reviews, Jira comments, failing CI, merge conflicts. Highest priority. Includes investigation follow-ups.
-2. **Interrupted work** — `in_progress` w/ `last_step` set, no PR yet. Resume.
+1. **Unaddressed feedback** — PR reviews, Jira comments, failing CI, merge conflicts. Highest priority. Includes investigation follow-ups. **Before acting**: reload `personas/<name>/prompt.md` for repo. Has CI fix patterns + sequencing rules.
+2. **Interrupted work** — `in_progress` w/ `last_step` set, no PR yet. Reload persona → resume.
 3. **Investigations without report** — `in_progress` + `needs-investigation`, no analysis posted yet.
 4. **CVE investigations missing grype scan** — `last_step = "investigation_posted"`, no grype scan done. Build Dockerfile + scan per CVE persona.
 5. **Failed retryable tasks** — `last_step` = `clone_failed`/`push_failed`/`ci_failed`. Retry once. Same error → `paused_reason`, move on.
@@ -181,11 +181,12 @@ None apply → Priority 1.
 
 For each `pr_open`/`pr_changes` task (check `metadata.prs` for multi-repo, else `repo`/`pr_number`/`pr_url`):
 
+0. **Reload persona**: Read `personas/<name>/prompt.md` for repo tech stack (same logic as step 6). Has CI fix patterns + sequencing rules.
 1. `cd` repo dir. `git fetch origin`. Fork? Also `git fetch upstream`.
 2. Check `host` in `project-repos.json` → `gh` (GitHub) or `glab` (GitLab). Fork repos: `glab mr` needs `--repo <upstream-project-path>`.
 3. PR status:
    - GH: `gh pr view <n> --json state,mergeable,statusCheckRollup,reviewDecision,reviews,url`
-   - GL: `glab mr view <n>`
+   - GL: `glab mr view <n> --repo <upstream-project-path>`. For CI status: `glab api "projects/<url-encoded-project>/merge_requests/<n>/pipelines" --hostname gitlab.cee.redhat.com`.
 
 4. **Review reminder**: If no Slack notification sent yet for this task → ALWAYS send `slack_notify` `review_reminder` (first notification, regardless of PR age). After first notification, cooldown handles repeat reminders automatically every 48h. **Bot reviews don't count** — only human reviews matter. PR with only bot reviews = still needs human review → send reminder.
 
@@ -199,13 +200,13 @@ For each `pr_open`/`pr_changes` task (check `metadata.prs` for multi-repo, else 
 - GH: MUST check BOTH:
   1. Inline: `gh api repos/{owner}/{repo}/pulls/{n}/comments`
   2. General: `gh api repos/{owner}/{repo}/issues/{n}/comments`
-- GL: `glab mr view <n> --comments`
+- GL: `glab api "projects/<url-encoded-project>/merge_requests/<n>/notes?per_page=50&sort=asc" --hostname gitlab.cee.redhat.com` — parse JSON for author + body. `glab mr view --comments` truncates, use API for full text. CI errors appear in devtools-bot notes — grep for `ERROR` / `failed`.
 - **Read FULL conversation** — don't rely on `last_addressed` as cutoff. For each comment, check if addressed: bot replied? subsequent commit fixed it? thread resolved? approval vs actionable request? `last_addressed` = soft hint only.
 - Read ALL comments including bot's own (GH: identify by `user.login`). Bot's own comments = context for what's already addressed, NOT new feedback. **Exception**: bot's own comments that describe a pending action (e.g. "commits are unsigned", "needs rebase", "will fix in next cycle") ARE open tasks — treat as self-assigned work items. Human comments w/o bot reply or subsequent fix = outstanding. Address outstanding feedback → commit → push.
 
 **Unsigned commits**: If any PR has unsigned commits (bot previously noted this, or `git log --show-signature` shows unsigned) → checkout branch, `git rebase --force-rebase HEAD~N` (N = number of unsigned commits) to re-sign, force push. This is a Priority 0 fix — unsigned commits block merge.
 - Screenshots requested → follow persona's "Verification for UI changes". Dev server + chrome-devtools MCP. **Never commit screenshots.** Upload as GH Release assets → reference URLs in PR comment.
-- Reply to reviews via `gh`/`glab`. `task_update` `last_addressed`. `memory_store` notable feedback as `review_feedback`. Jira comment.
+- Reply to reviews via `gh` / `glab api "projects/<url-encoded-project>/merge_requests/<n>/notes" -X POST -f "body=<text>" --hostname gitlab.cee.redhat.com`. `task_update` `last_addressed`. `memory_store` notable feedback as `review_feedback`. Jira comment.
 
 **Jira comments**:
 - `jira_get_issue` → read ALL comments. Identify bot comments by **content patterns only** (structured reports, tables, PR links). Short conversational = human. **Do NOT filter by author** (shared identity). When in doubt → human feedback.

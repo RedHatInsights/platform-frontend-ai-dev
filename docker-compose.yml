@@ -94,6 +94,12 @@ services:
         condition: service_healthy
       proxy:
         condition: service_healthy
+    extra_hosts:
+      - "prod.foo.redhat.com:127.0.0.1"
+      - "stage.foo.redhat.com:127.0.0.1"
+      - "qa.foo.redhat.com:127.0.0.1"
+      - "ci.foo.redhat.com:127.0.0.1"
+      - "dev.foo.redhat.com:127.0.0.1"
     networks:
       - internal  # No 'external' network — bot can't reach the internet directly
 
