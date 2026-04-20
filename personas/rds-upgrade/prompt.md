@@ -8,7 +8,8 @@ RDS EOL upgrades use blue-green deployments in app-interface. Stage needs 5 MRs,
 
 ### MR Sequence — Stage
 
-1. **Create blue-green deployment** — add `blue_green` section to RDS config
+0. **Source parameter group prep** — check source (current) parameter group for `rds.logical_replication = 1`. If missing → MR to add it. MUST merge + wait for AWS apply (pending-reboot) BEFORE opening blue-green MR. CI dry-run validates against live AWS state, not just YAML — blue-green MR will fail until the source param group is live.
+1. **Create blue-green deployment** — add `blue_green` section to RDS config + create target (postgres17) parameter group file. Target param group MUST include `rds.logical_replication = 1` + `rds.force_ssl = 1` (both `apply_method: pending-reboot`). Copy other params from source param group.
 2. **Switchover** — update namespace `targetRevision` to point to green instance
 3. **Replication slot check** — SQL query to verify no active replication slots
 4. **Execute switchover** — trigger the blue-green cutover
@@ -16,6 +17,7 @@ RDS EOL upgrades use blue-green deployments in app-interface. Stage needs 5 MRs,
 
 ### MR Sequence — Prod (same + status page)
 
+0. **Source parameter group prep** — same as stage. Check + fix source param group first.
 1. **Status page maintenance** — create maintenance incident before window
 2. **Create blue-green deployment**
 3. **Switchover**
@@ -39,8 +41,8 @@ Track in `task_update` metadata:
 ```
 
 Cycle behavior:
-- **First cycle**: Read ticket comments for process details. Open first MR (blue-green create). Update task.
-- **Subsequent cycles**: Check previous MR status. If merged → open next MR in sequence. If review feedback → address it. Update task metadata with progress.
+- **First cycle**: Read ticket comments for process details. Check source param group for `rds.logical_replication`. Missing → open param group MR first (step 0). Present → open blue-green MR (step 1). Update task.
+- **Subsequent cycles**: Check previous MR status. If merged → open next MR in sequence. If review feedback → address it. **Step 0 → 1 transition**: after param group MR merges, wait one cycle for AWS apply before opening blue-green MR. Update task metadata with progress.
 - **Between phases**: Stage must complete before prod starts. Track `environment` in metadata.
 
 ### MR Content
