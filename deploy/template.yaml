@@ -18,7 +18,7 @@ parameters:
 - name: PROXY_IMAGE_TAG
   value: latest
 - name: BOT_LABEL
-  value: hcc-ai-framework
+  value: hcc-ai-bot
 - name: BOT_REPLICAS
   value: "1"
 objects:
@@ -266,25 +266,25 @@ objects:
             valueFrom:
               secretKeyRef:
                 name: devbot-secrets
-                key: SSH_PRIVATE_KEY_B64
+                key: gh-bot-private-key
                 optional: true
           - name: GPG_PRIVATE_KEY_B64
             valueFrom:
               secretKeyRef:
                 name: devbot-secrets
-                key: GPG_PRIVATE_KEY_B64
+                key: gh-bot-gpg-private
                 optional: true
           - name: GH_TOKEN
             valueFrom:
               secretKeyRef:
                 name: devbot-secrets
-                key: GH_TOKEN
+                key: gh-bot-cli-token
                 optional: true
           - name: GOOGLE_SA_KEY_B64
             valueFrom:
               secretKeyRef:
                 name: devbot-secrets
-                key: GOOGLE_SA_KEY_B64
+                key: gcp-vertex-claude-sa
                 optional: true
           resources:
             requests:
