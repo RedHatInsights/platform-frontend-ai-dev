@@ -160,5 +160,17 @@
   "frontend-starter-app": {
     "url": "git@github.com-bot:platex-rehor-bot/frontend-starter-app.git",
     "upstream": "git@github.com:RedHatInsights/frontend-starter-app.git"
+  },
+  "platform-frontend-ai-dev": {
+    "url": "git@github.com-bot:platex-rehor-bot/platform-frontend-ai-dev.git",
+    "upstream": "git@github.com:RedHatInsights/platform-frontend-ai-dev.git"
+  },
+  "api-frontend": {
+    "url": "git@github.com-bot:platex-rehor-bot/api-frontend.git",
+    "upstream": "git@github.com:RedHatInsights/api-frontend.git"
+  },
+  "cypress-e2e-image": {
+    "url": "git@github.com-bot:platex-rehor-bot/cypress-e2e-image.git",
+    "upstream": "git@github.com:RedHatInsights/cypress-e2e-image.git"
   }
 }
