@@ -12,7 +12,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
-    "recharts": "^2.15.0",
+    "recharts": "^3.0.0",
     "three": "^0.184.0"
   },
   "devDependencies": {
