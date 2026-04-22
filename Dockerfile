@@ -130,9 +130,11 @@ COPY config.json project-repos.json CLAUDE.md .mcp.json entrypoint.sh ./
 COPY .claude/ .claude/
 COPY personas/ personas/
 
-# Fix ownership
-RUN chown -R botuser:botuser /home/botuser/app
+# Fix ownership — botuser:0 + group-writable so OpenShift arbitrary UIDs (always GID 0) can write
+RUN chown -R botuser:0 /home/botuser \
+    && chmod -R g+rwX /home/botuser
 
+ENV HOME=/home/botuser
 USER botuser
 
 # Buildah rootless config — vfs driver (no kernel module needed, works everywhere)

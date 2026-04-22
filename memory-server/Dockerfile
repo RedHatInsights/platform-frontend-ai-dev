@@ -13,6 +13,8 @@ USER 0
 
 RUN pip3 install uv
 
+ENV UV_CACHE_DIR=/tmp/uv-cache
+
 WORKDIR /app
 
 COPY memory-server/pyproject.toml memory-server/uv.lock* ./
