@@ -130,10 +130,6 @@ COPY config.json project-repos.json CLAUDE.md .mcp.json entrypoint.sh ./
 COPY .claude/ .claude/
 COPY personas/ personas/
 
-# Fix ownership — botuser:0 + group-writable so OpenShift arbitrary UIDs (always GID 0) can write
-RUN chown -R botuser:0 /home/botuser \
-    && chmod -R g+rwX /home/botuser
-
 ENV HOME=/home/botuser
 USER botuser
 
@@ -157,5 +153,12 @@ RUN git config --global user.name "platex-rehor-bot" \
     && git config --global user.email "platform-experience-services@redhat.com" \
     && git config --global gpg.format openpgp \
     && git config --global commit.gpgsign true
+
+# Fix ownership — botuser:0 + group-writable so OpenShift arbitrary UIDs (always GID 0) can write.
+# Must run last so it covers all dirs created above (.ssh, .config, .gitconfig, etc.)
+USER 0
+RUN chown -R botuser:0 /home/botuser \
+    && chmod -R g+rwX /home/botuser
+USER botuser
 
 ENTRYPOINT ["bash", "entrypoint.sh"]

@@ -6,17 +6,17 @@ parameters:
 - name: NAMESPACE
   value: ${NAMESPACE}
 - name: BOT_IMAGE
-  value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev-bot
+  value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev
 - name: BOT_IMAGE_TAG
-  value: latest
+  required: true
 - name: MEMORY_SERVER_IMAGE
   value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev-memory-server
 - name: MEMORY_SERVER_IMAGE_TAG
-  value: latest
+  required: true
 - name: PROXY_IMAGE
   value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev-proxy
 - name: PROXY_IMAGE_TAG
-  value: latest
+  required: true
 - name: BOT_LABEL
   value: hcc-ai-bot
 - name: BOT_REPLICAS
