@@ -129,6 +129,8 @@ CHROME_BIN=$(find "$PLAYWRIGHT_BROWSERS_PATH" -name chrome -type f | head -1)
     --remote-allow-origins=* \
     --ignore-certificate-errors \
     --host-resolver-rules='MAP consent.trustarc.com 127.0.0.1' \
+    --proxy-server="${HTTPS_PROXY:-http://proxy:3128}" \
+    --proxy-bypass-list='*.foo.redhat.com;localhost;127.0.0.1' \
     --no-first-run --disable-sync --disable-extensions --disable-popup-blocking &
 
 # Wait for Chromium to be ready

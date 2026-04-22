@@ -26,3 +26,4 @@ sa-key.json
 .ssh/
 .gitconfig
 .DS_STORE
+.tmp-*

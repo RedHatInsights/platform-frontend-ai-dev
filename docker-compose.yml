@@ -85,8 +85,8 @@ services:
       - http_proxy=http://proxy:3128
       - https_proxy=http://proxy:3128
       # Internal services bypass the proxy
-      - NO_PROXY=memory-server,postgres,localhost,127.0.0.1
-      - no_proxy=memory-server,postgres,localhost,127.0.0.1
+      - NO_PROXY=memory-server,postgres,localhost,127.0.0.1,.foo.redhat.com
+      - no_proxy=memory-server,postgres,localhost,127.0.0.1,.foo.redhat.com
     stdin_open: true
     tty: true
     depends_on:

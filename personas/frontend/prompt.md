@@ -1,86 +1,89 @@
 ## Frontend Guidelines
 
-You are working on a frontend application in the Red Hat Hybrid Cloud Console ecosystem.
+Frontend app in Red Hat Hybrid Cloud Console ecosystem.
 
-### Before making any changes
-- Run `npm install` (or the project's package manager) first.
-- If `npm install` fails, STOP immediately. Report the failure on the Jira ticket and do not proceed.
+### Before changes
+- `npm install` first. Fails → STOP, report on Jira, do not proceed.
 
 ### Development
-- Use PatternFly components. Use the `hcc-patternfly-data-view` MCP tools to look up component documentation, examples, and source code.
-- Follow React best practices and the existing patterns in the codebase.
-- Use TypeScript. Ensure all new code is properly typed.
-- Use the LSP tool to check for type errors before committing.
-- When adding or modifying UI components, check PatternFly docs via MCP for the correct API usage.
-- **Always use npm scripts** — never call CLI tools directly. Use `npm test`, `npm run lint`, `npm run build`, etc. instead of `npx jest`, `npx eslint`, `npx tsc`, `tsx`, or similar. Check `package.json` for available scripts. The only exception is the dev server command (`node_modules/.bin/fec dev --clouddotEnv stage`) which has no npm script equivalent.
+- PatternFly components. Use `hcc-patternfly-data-view` MCP for docs/examples/source.
+- React best practices, existing codebase patterns.
+- TypeScript. All new code properly typed.
+- LSP `get_diagnostics` before committing.
+- Check PatternFly docs via MCP for correct API usage.
+- **npm scripts only** — `npm test`, `npm run lint`, `npm run build`. Never `npx jest`/`npx eslint`/`npx tsc`/`tsx` directly. Check `package.json` for scripts.
 
-### Verification — MANDATORY for all UI changes
+### Verification — MANDATORY for UI changes
 
-**You MUST visually verify every UI change before opening a PR.** This is not optional. If a ticket touches anything visual (components, styles, layout, text, dropdowns, modals, etc.), you must start the dev server, navigate to the affected page, and take screenshots. Do not skip this step.
+**MUST visually verify every UI change before PR.** Ticket touches anything visual → build, start dev proxy, navigate, screenshot. No exceptions.
 
-**Do NOT use Storybook, Chromatic, or any other tool for visual verification.** Always use the dev server (`node_modules/.bin/fec dev --clouddotEnv stage`) and the `chrome-devtools` MCP tools to take real screenshots of the running application. This is the only way to verify changes in the actual HCC environment.
+**Do NOT use Storybook/Chromatic.** Dev proxy + `chrome-devtools` MCP only — real screenshots in actual HCC env.
 
-The same applies when a PR reviewer asks for a screenshot — start the dev server and take a real screenshot.
+Same when reviewer asks for screenshots.
 
-0. **Kill any stale dev server**: Before starting, ensure no leftover dev server is running from a previous cycle:
+#### Architecture
+
+Dev proxy (Caddy) on port 1337 routes:
+- App assets → local static file server (build output)
+- Everything else → `console.stage.redhat.com`
+
+Chrome navigates `https://stage.foo.redhat.com:1337/` → resolves 127.0.0.1 via container `extra_hosts`.
+
+#### Steps
+
+0. **Kill stale**: `lsof -ti :1337,:8003,:9912 | xargs kill 2>/dev/null || true`
+
+1. **Build**: `npm run build`
+
+2. **Static file server** — serve build output:
+
+   insights-chrome (shell): `npx http-server ./build -p 9912 -c-1 -a :: --cors=\* &`
+
+   Regular apps (federated modules): `npx http-server ./build -p 8003 -c-1 -a :: --cors=\* &`
+
+3. **Routes config** — write `/tmp/dev-proxy-routes.json`:
+
+   insights-chrome:
+   ```json
+   {"/apps/chrome*": {"url": "http://127.0.0.1:9912", "is_chrome": true}}
    ```
-   lsof -ti :1337 | xargs kill 2>/dev/null || true
+
+   Regular apps — app name from `package.json` `insights.appname` or `fec.config.js` `appUrl`:
+   ```json
+   {"/apps/<app-name>*": {"url": "http://127.0.0.1:8003"}}
    ```
 
-1. **Start the dev server**: Run the dev server from the repo directory:
-   ```
-   node_modules/.bin/fec dev --clouddotEnv stage
-   ```
-   Run this in the background. The app will be available at `https://stage.foo.redhat.com:1337/`.
+   Optional local API: add `"/api/<app-name>/*": {"url": "http://127.0.0.1:8000", "rh-identity-headers": true}`
 
-   **Important**: The dev server proxies all requests to `console.stage.redhat.com`. The initial page load is very slow (2-3 minutes) because hundreds of federated module assets are fetched through the proxy without cache. Be patient — wait up to 3 minutes for the SPA to fully load.
+4. **Start proxy**: `ROUTES_JSON_PATH=/tmp/dev-proxy-routes.json start-dev-proxy.sh &`
 
-2. **Navigate to the page**: Use the chrome-devtools MCP `navigate_page` tool to open the affected page URL.
+   Wait few seconds for Caddy. App at `https://stage.foo.redhat.com:1337/`.
 
-3. **Handle SSO login**: The page will redirect to an SSO/Keycloak login page. This is a two-step login flow:
-   - Read the `SSO_USERNAME` and `SSO_PASSWORD` environment variables (e.g. `echo $SSO_USERNAME`).
-   - Take a snapshot to find the username input field and "Next" button.
-   - Use `fill` to enter the username, then `click` the "Next" button.
-   - Wait for the password field to appear (use `wait_for` with text `["Password"]`).
-   - Use `fill` to enter the password, then `click` the "Log in" button.
-   - Wait for the redirect back to the app.
+   First load slow (2-3 min) — federated modules fetched from stage w/o cache. Be patient.
 
-4. **Wait for the SPA to load**: After login, the page takes a long time to load all federated modules. Be patient:
-   - Use `wait_for` with text like `["Hi!", "Welcome to", "Favorites"]` and a timeout of at least **180000ms** (3 minutes).
-   - If it times out, take a screenshot to check progress. If the page header is showing (Red Hat logo, user name), the chrome shell has loaded and the main content just needs more time.
-   - Take another screenshot or snapshot to confirm the dashboard has fully rendered before proceeding.
+5. **Navigate**: chrome-devtools MCP `navigate_page` → affected page URL.
 
-5. **Take a "before" screenshot**: Before your changes, navigate to the affected page and take a screenshot.
+6. **SSO login** — two-step:
+   - Read creds from `/home/botuser/app/.credentials` (JSON: `{"sso": {"username": "...", "password": "..."}}`). Env vars are unset at startup.
+   - Snapshot → find username field + "Next" btn.
+   - `fill` username → `click` "Next".
+   - `wait_for` `["Password"]` → `fill` password → `click` "Log in".
+   - Wait redirect.
 
-6. **Take an "after" screenshot**: After your changes, restart the dev server if needed, navigate to the same page, and take another screenshot.
+7. **Wait for SPA**: `wait_for` `["Hi!", "Welcome to", "Favorites"]` timeout **180000ms** (3 min). Timeout → screenshot to check. Header showing = chrome loaded, content still loading. Confirm full render w/ another screenshot.
 
-7. **Compare with mocks**: If the ticket has attached mockups/designs, compare your "after" screenshot against them. Make sure the implementation matches the design.
+8. **Screenshots**: "before" + "after". Compare w/ mockups if ticket has them.
 
-8. **Upload screenshots to the PR**: Do NOT commit screenshot files to the repo. Do NOT use base64 data URIs (GitHub strips them). Instead, upload screenshots as GitHub Release assets and reference them by URL:
-   - Save screenshots to `/tmp/` with the ticket key as prefix (e.g. `/tmp/RHCLOUD-12345-after.png`).
-   - Look up the repo's fork name from `project-repos.json` (the `url` field, e.g. `platex-rehor-bot/insights-chrome`).
-   - Ensure a `bot-screenshots` release exists in the fork. If not, create it:
-     ```
-     gh release create bot-screenshots --repo <fork-owner/repo> --title "Bot Screenshots" --notes "Automated screenshots from dev-bot"
-     ```
-   - Upload the screenshot:
-     ```
-     gh release upload bot-screenshots /tmp/RHCLOUD-12345-after.png --repo <fork-owner/repo> --clobber
-     ```
-   - Post a PR comment with the image URL:
-     ```
-     gh pr comment <pr-number> --repo <upstream-owner/repo> --body "### After fix
-     ![after screenshot](https://github.com/<fork-owner/repo>/releases/download/bot-screenshots/RHCLOUD-12345-after.png)"
-     ```
-   - Use `--clobber` on upload to overwrite if a file with the same name already exists (e.g. when re-uploading after fixes).
+9. **Upload to PR** — never commit screenshots, never base64 data URIs:
+   - Save `/tmp/RHCLOUD-12345-after.png`.
+   - Fork name from `project-repos.json` `url` field.
+   - Ensure release: `gh release create bot-screenshots --repo <fork> --title "Bot Screenshots" --notes "Automated"` (if missing)
+   - Upload: `gh release upload bot-screenshots /tmp/RHCLOUD-12345-after.png --repo <fork> --clobber`
+   - PR comment: `gh pr comment <n> --repo <upstream> --body "### After fix\n![after](https://github.com/<fork>/releases/download/bot-screenshots/RHCLOUD-12345-after.png)"`
 
-9. **Stop the dev server** when done. This is **mandatory** — never leave the dev server running after verification is complete:
-   ```
-   lsof -ti :1337 | xargs kill
-   ```
-   Verify it stopped: `lsof -ti :1337` should return nothing.
+10. **Stop everything** — mandatory: `lsof -ti :1337,:8003,:9912 | xargs kill`. Verify: should return nothing.
 
 ### Verification for non-UI changes
-- Before starting the dev server, kill any stale instances: `lsof -ti :1337 | xargs kill 2>/dev/null || true`
-- Use chrome-devtools MCP to check the UI at `https://stage.foo.redhat.com:1337/` and verify your changes don't break anything visually if the ticket includes reproduction steps.
-- **Always stop the dev server** after verification: `lsof -ti :1337 | xargs kill`
+- Kill stale: `lsof -ti :1337,:8003,:9912 | xargs kill 2>/dev/null || true`
+- If ticket has repro steps → build + proxy (steps 1-4), verify no visual regressions via chrome-devtools MCP.
+- **Always stop all servers**: `lsof -ti :1337,:8003,:9912 | xargs kill`

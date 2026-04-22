@@ -1,3 +1,9 @@
+# Dev proxy — build custom Caddy from source on UBI (passes EC)
+FROM registry.access.redhat.com/ubi9/go-toolset:latest AS dev-proxy-builder
+COPY dev-proxy/ /tmp/dev-proxy/
+RUN cd /tmp/dev-proxy \
+    && go build -o /tmp/caddy .
+
 FROM registry.access.redhat.com/ubi9/ubi:latest
 
 # System deps + Python 3.12 + Chromium runtime libraries
@@ -103,6 +109,12 @@ RUN dnf install -y --nodocs buildah fuse-overlayfs \
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://github.com/anchore/grype/releases/download/v0.87.0/grype_0.87.0_linux_${ARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin grype
+
+# Dev proxy (custom Caddy for local UI verification against stage)
+COPY --from=dev-proxy-builder /tmp/caddy /usr/local/bin/caddy
+COPY dev-proxy/Caddyfile /etc/caddy/Caddyfile
+COPY dev-proxy/start-proxy.sh /usr/local/bin/start-dev-proxy.sh
+RUN chmod +x /usr/local/bin/start-dev-proxy.sh
 
 # Pre-install MCP servers so they don't need network at runtime
 RUN npm install -g chrome-devtools-mcp@latest @redhat-cloud-services/hcc-pf-mcp
