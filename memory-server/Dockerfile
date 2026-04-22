@@ -33,4 +33,4 @@ RUN uv run python -c "from sentence_transformers import SentenceTransformer; Sen
 
 EXPOSE 8080
 
-CMD ["uv", "run", "python", "-m", "src.server"]
+CMD ["uv", "run", "--no-sync", "python", "-m", "src.server"]

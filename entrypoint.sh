@@ -2,12 +2,27 @@
 # Bot container entrypoint — decode secrets, start Chromium, launch bot.
 set -e
 
+# Kubernetes secretKeyRef auto-decodes base64, so secrets arrive as raw values
+# in OpenShift. Local docker-compose still passes them base64-encoded via .env.
+# This helper handles both: values starting with "-----" or "{" are not valid
+# base64 and are the only two raw formats we expect, so write them as-is.
+# Everything else is base64-decoded.
+decode_or_raw() {
+    case "$1" in
+        -----*|"{"*) printf '%s' "$1" ;;
+        *) echo "$1" | base64 -d 2>/dev/null ;;
+    esac
+}
+
 # Decode SSH keys (separate keys for GitHub and GitLab)
-echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/id_gh
-chmod 600 ~/.ssh/id_gh
+if [ -n "${SSH_PRIVATE_KEY_B64:-}" ]; then
+    decode_or_raw "$SSH_PRIVATE_KEY_B64" > ~/.ssh/id_gh
+    chmod 600 ~/.ssh/id_gh
+    unset SSH_PRIVATE_KEY_B64
+fi
 
 if [ -n "${GITLAB_SSH_KEY_B64:-}" ]; then
-    echo "$GITLAB_SSH_KEY_B64" | base64 -d > ~/.ssh/id_gl
+    decode_or_raw "$GITLAB_SSH_KEY_B64" > ~/.ssh/id_gl
     chmod 600 ~/.ssh/id_gl
     unset GITLAB_SSH_KEY_B64
 fi
@@ -41,12 +56,16 @@ EOF
 fi
 
 # Import GPG key for commit signing
-gpg --batch --import <(echo "$GPG_PRIVATE_KEY_B64" | base64 -d) 2>/dev/null
+if [ -n "${GPG_PRIVATE_KEY_B64:-}" ]; then
+    gpg --batch --import <(decode_or_raw "$GPG_PRIVATE_KEY_B64") 2>/dev/null
+fi
 export GPG_SIGNING_KEY="$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep ed25519 | head -1 | awk '{print $2}' | cut -d/ -f2)"
 git config --global user.signingkey "$GPG_SIGNING_KEY"
 
 # Decode GCP service account key
-echo "$GOOGLE_SA_KEY_B64" | base64 -d > /home/botuser/sa-key.json
+if [ -n "${GOOGLE_SA_KEY_B64:-}" ]; then
+    decode_or_raw "$GOOGLE_SA_KEY_B64" > /home/botuser/sa-key.json
+fi
 
 # Point MCP config to the memory server
 sed -i "s|http://localhost:8080/sse|${BOT_MEMORY_URL}|" .mcp.json
