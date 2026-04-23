@@ -35,11 +35,19 @@ Chrome navigates `https://stage.foo.redhat.com:1337/` → resolves 127.0.0.1 via
 
 1. **Build**: `npm run build`
 
-2. **Static file server** — serve build output:
+2. **Static file server** — serve build output (check `webpack.config` or `vite.config` for output dir — usually `dist/` or `build/`):
 
-   insights-chrome (shell): `npx http-server ./build -p 9912 -c-1 -a :: --cors=\* &`
+   insights-chrome (shell): `nohup npx http-server ./dist -p 9912 -c-1 -a :: --cors=\* > /tmp/http-server.log 2>&1 &`
 
-   Regular apps (federated modules): `npx http-server ./build -p 8003 -c-1 -a :: --cors=\* &`
+   Regular apps (federated modules): `nohup npx http-server ./dist -p 8003 -c-1 -a :: --cors=\* > /tmp/http-server.log 2>&1 &`
+
+   **MUST use `nohup`** — without it, http-server dies when the shell session ends.
+
+   **insights-chrome only**: Create symlinks so `/apps/chrome/*` paths resolve:
+   ```bash
+   mkdir -p dist/apps/chrome
+   for f in dist/*; do [ "$(basename "$f")" = "apps" ] && continue; ln -sf "../../$(basename "$f")" "dist/apps/chrome/$(basename "$f")"; done
+   ```
 
 3. **Routes config** — write `/tmp/dev-proxy-routes.json`:
 
@@ -55,7 +63,7 @@ Chrome navigates `https://stage.foo.redhat.com:1337/` → resolves 127.0.0.1 via
 
    Optional local API: add `"/api/<app-name>/*": {"url": "http://127.0.0.1:8000", "rh-identity-headers": true}`
 
-4. **Start proxy**: `ROUTES_JSON_PATH=/tmp/dev-proxy-routes.json start-dev-proxy.sh &`
+4. **Start proxy**: `nohup bash -c 'ROUTES_JSON_PATH=/tmp/dev-proxy-routes.json start-dev-proxy.sh' > /tmp/caddy.log 2>&1 &`
 
    Wait few seconds for Caddy. App at `https://stage.foo.redhat.com:1337/`.
 
@@ -87,3 +95,60 @@ Chrome navigates `https://stage.foo.redhat.com:1337/` → resolves 127.0.0.1 via
 - Kill stale: `lsof -ti :1337,:8003,:9912 | xargs kill 2>/dev/null || true`
 - If ticket has repro steps → build + proxy (steps 1-4), verify no visual regressions via chrome-devtools MCP.
 - **Always stop all servers**: `lsof -ti :1337,:8003,:9912 | xargs kill`
+
+### Playwright e2e tests
+
+Run Playwright tests if the repo has them (`playwright.config.ts` exists). Do this **after** visual verification, with dev proxy already running.
+
+#### Prerequisites
+
+Dev proxy + http-server must be running (steps 0-4 above). If not already started, start them first.
+
+#### Patch playwright.config.ts
+
+Playwright launches its own Chromium — it needs proxy + host resolver args to work in the container. Patch `playwright.config.ts` before running:
+
+Add `launchOptions` to the `use` block:
+```typescript
+use: {
+  // ... existing config ...
+  launchOptions: {
+    args: [
+      '--proxy-server=http://proxy:3128',
+      '--proxy-bypass-list=*.foo.redhat.com;localhost;127.0.0.1',
+      '--host-resolver-rules=MAP stage.foo.redhat.com 127.0.0.1,MAP consent.trustarc.com 127.0.0.1',
+      '--ignore-certificate-errors',
+      '--no-sandbox',
+      '--disable-gpu',
+    ],
+  },
+}
+```
+
+Do NOT commit this patch — it's container-specific. `git checkout -- playwright.config.ts` after tests.
+
+#### Run tests
+
+```bash
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+export PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+export E2E_USER=$(python3.12 -c "import json; c=json.load(open('/home/botuser/app/.credentials')); print(c['sso']['username'])")
+export E2E_PASSWORD=$(python3.12 -c "import json; c=json.load(open('/home/botuser/app/.credentials')); print(c['sso']['password'])")
+
+npx playwright test --workers=1 --max-failures=1 --reporter=list
+```
+
+**`--workers=1` mandatory** — container can't spawn multiple Chrome instances.
+
+#### Failures
+
+- All pass → proceed to PR
+- Test failure → check `test-results/` for screenshots + videos. Fix code, re-run.
+- `EAGAIN` / `pthread_create` errors → resource limits, already mitigated by `--workers=1`
+- `Xvfb` errors → only affects Cypress, not Playwright. Ignore Cypress e2e, run Playwright only.
+
+#### Cleanup
+
+Revert playwright.config.ts patch: `git checkout -- playwright.config.ts`
+
+Stop servers (step 10 above).
