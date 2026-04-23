@@ -41,7 +41,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/darkweak/go-esi v0.0.5 // indirect
-	github.com/darkweak/souin v1.7.7 // indirect
+	github.com/darkweak/souin v1.7.8 // indirect
 	github.com/darkweak/storages/core v0.0.15 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
