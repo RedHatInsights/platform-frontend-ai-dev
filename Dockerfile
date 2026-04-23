@@ -105,6 +105,11 @@ RUN dnf install -y --nodocs libcap-devel \
 RUN dnf install -y --nodocs buildah fuse-overlayfs \
     && dnf clean all
 
+# tini — proper init process that reaps zombie children
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
+    && curl -fsSL -o /usr/local/bin/tini "https://github.com/krallin/tini/releases/download/v0.19.0/tini-${ARCH}" \
+    && chmod +x /usr/local/bin/tini
+
 # grype (container image vulnerability scanner)
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://github.com/anchore/grype/releases/download/v0.87.0/grype_0.87.0_linux_${ARCH}.tar.gz" \
@@ -176,4 +181,4 @@ RUN chown -R botuser:0 /home/botuser \
     && chmod -R g+rwX /home/botuser
 USER botuser
 
-ENTRYPOINT ["bash", "entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "bash", "entrypoint.sh"]
