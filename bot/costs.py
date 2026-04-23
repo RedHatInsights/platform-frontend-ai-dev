@@ -19,6 +19,24 @@ logger = logging.getLogger(__name__)
 COSTS_API = os.environ.get("COSTS_API_URL", "http://localhost:8080/api/costs")
 
 
+_NO_WORK_PATTERNS = [
+    "NO_WORK_FOUND",
+    "no work found",
+    "no work available",
+    "nothing to do",
+    "nothing to pick up",
+    "no tickets",
+    "no unassigned",
+    "no assigned tickets",
+    "0 unassigned",
+]
+
+
+def _is_no_work(text: str) -> bool:
+    lower = text.lower()
+    return any(p.lower() in lower for p in _NO_WORK_PATTERNS)
+
+
 def _build_entry(label: str, result, ctx: CycleContext | None = None) -> dict:
     """Build a cost entry dict from an SDK ResultMessage."""
     usage = getattr(result, "usage", None) or {}
@@ -42,7 +60,7 @@ def _build_entry(label: str, result, ctx: CycleContext | None = None) -> dict:
         "cache_write_tokens": usage.get("cache_creation_input_tokens", 0),
         "model": model,
         "is_error": getattr(result, "subtype", "") != "success",
-        "no_work": "NO_WORK_FOUND" in result_text,
+        "no_work": _is_no_work(result_text),
     }
 
     if ctx:
