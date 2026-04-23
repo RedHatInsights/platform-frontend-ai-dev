@@ -11,7 +11,11 @@ parameters:
   value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev-memory-server
 - name: PROXY_IMAGE
   value: quay.io/redhat-services-prod/hcc-platex-services/platform-frontend-ai-dev-proxy
-- name: IMAGE_TAG
+- name: BOT_IMAGE_TAG
+  required: true
+- name: MEMORY_SERVER_IMAGE_TAG
+  required: true
+- name: PROXY_IMAGE_TAG
   required: true
 - name: BOT_LABEL
   value: hcc-ai-bot
@@ -58,7 +62,7 @@ objects:
       spec:
         containers:
         - name: memory-server
-          image: ${MEMORY_SERVER_IMAGE}:${IMAGE_TAG}
+          image: ${MEMORY_SERVER_IMAGE}:${MEMORY_SERVER_IMAGE_TAG}
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
@@ -161,7 +165,7 @@ objects:
       spec:
         containers:
         - name: proxy
-          image: ${PROXY_IMAGE}:${IMAGE_TAG}
+          image: ${PROXY_IMAGE}:${PROXY_IMAGE_TAG}
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
@@ -230,7 +234,7 @@ objects:
       spec:
         containers:
         - name: bot
-          image: ${BOT_IMAGE}:${IMAGE_TAG}
+          image: ${BOT_IMAGE}:${BOT_IMAGE_TAG}
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
