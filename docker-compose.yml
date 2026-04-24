@@ -65,11 +65,15 @@ services:
     env_file:
       - .env
     environment:
-      - SSH_PRIVATE_KEY_B64
-      - GITLAB_SSH_KEY_B64
       - GPG_PRIVATE_KEY_B64
       - GH_TOKEN
       - GITLAB_TOKEN
+      - GH_USER_NAME
+      - GH_USER_EMAIL
+      - GH_USERNAME
+      - GL_USER_NAME
+      - GL_USER_EMAIL
+      - GL_USERNAME
       - GOOGLE_SA_KEY_B64
       - SSO_USERNAME
       - SSO_PASSWORD

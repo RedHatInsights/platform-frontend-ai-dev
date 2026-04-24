@@ -21,6 +21,18 @@ parameters:
   value: hcc-ai-bot
 - name: BOT_REPLICAS
   value: "1"
+- name: GH_USER_NAME
+  required: true
+- name: GH_USER_EMAIL
+  required: true
+- name: GH_USERNAME
+  required: true
+- name: GL_USER_NAME
+  required: true
+- name: GL_USER_EMAIL
+  required: true
+- name: GL_USERNAME
+  required: true
 objects:
 
 # ============================================================================
@@ -257,7 +269,20 @@ objects:
             value: "60"
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /home/botuser/sa-key.json
-          # Proxy — PROXY_HOST for SSH config, HTTP(S)_PROXY for HTTP clients
+          # Git identity — per-platform (name, email, login)
+          - name: GH_USER_NAME
+            value: ${GH_USER_NAME}
+          - name: GH_USER_EMAIL
+            value: ${GH_USER_EMAIL}
+          - name: GH_USERNAME
+            value: ${GH_USERNAME}
+          - name: GL_USER_NAME
+            value: ${GL_USER_NAME}
+          - name: GL_USER_EMAIL
+            value: ${GL_USER_EMAIL}
+          - name: GL_USERNAME
+            value: ${GL_USERNAME}
+          # Proxy — HTTP(S)_PROXY for git and HTTP clients
           - name: PROXY_HOST
             value: devbot-proxy
           - name: HTTP_PROXY
@@ -273,11 +298,6 @@ objects:
           - name: no_proxy
             value: devbot-memory-server,localhost,127.0.0.1
           # Secrets from Vault (devbot-secrets)
-          - name: SSH_PRIVATE_KEY_B64
-            valueFrom:
-              secretKeyRef:
-                name: devbot-secrets
-                key: gh-bot-private-key
           - name: GPG_PRIVATE_KEY_B64
             valueFrom:
               secretKeyRef:
@@ -288,6 +308,11 @@ objects:
               secretKeyRef:
                 name: devbot-secrets
                 key: gh-bot-cli-token
+          - name: GITLAB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: gl-bot-cli-token
           - name: GOOGLE_SA_KEY_B64
             valueFrom:
               secretKeyRef:

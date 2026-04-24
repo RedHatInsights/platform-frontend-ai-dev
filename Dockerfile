@@ -10,7 +10,6 @@ FROM registry.access.redhat.com/ubi9/ubi:latest
 RUN dnf install -y --nodocs --allowerasing \
     python3.12 python3.12-pip python3.12-devel \
     git \
-    openssh-clients \
     curl \
     jq \
     socat \
@@ -158,19 +157,9 @@ RUN mkdir -p /home/botuser/.config/containers /home/botuser/.local/share/contain
     && echo -e '[registries.search]\nregistries = ["registry.access.redhat.com", "quay.io", "docker.io"]' \
        > /home/botuser/.config/containers/registries.conf
 
-# SSH directory — config is generated at runtime by entrypoint.sh
-RUN mkdir -p /home/botuser/.ssh && chmod 700 /home/botuser/.ssh
-ENV GIT_SSH_COMMAND="ssh -F /home/botuser/.ssh/config"
 
-# Pre-add known host keys so first connection doesn't warn
-RUN ssh-keyscan -t ed25519,rsa,ecdsa github.com >> /home/botuser/.ssh/known_hosts 2>/dev/null \
-    && ssh-keyscan -t ed25519,rsa,ecdsa gitlab.cee.redhat.com >> /home/botuser/.ssh/known_hosts 2>/dev/null; \
-    chmod 600 /home/botuser/.ssh/known_hosts
-
-# Git config
-RUN git config --global user.name "platex-rehor-bot" \
-    && git config --global user.email "platform-experience-services@redhat.com" \
-    && git config --global http.https://gitlab.cee.redhat.com.sslVerify false \
+# Git config (per-platform identity is set at runtime via includeIf)
+RUN git config --global http.https://gitlab.cee.redhat.com.sslVerify false \
     && git config --global gpg.format openpgp \
     && git config --global commit.gpgsign true
 
