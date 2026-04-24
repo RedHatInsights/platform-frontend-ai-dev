@@ -27,37 +27,18 @@ decode_or_raw() {
     esac
 }
 
-# Decode SSH keys (separate keys for GitHub and GitLab)
-if [ -n "${SSH_PRIVATE_KEY_B64:-}" ]; then
-    decode_or_raw "$SSH_PRIVATE_KEY_B64" > ~/.ssh/id_gh
-    chmod 600 ~/.ssh/id_gh
-    unset SSH_PRIVATE_KEY_B64
+# Git credential helpers for HTTPS auth (replaces SSH keys)
+# GitHub: gh CLI acts as credential helper (set up below)
+# GitLab: custom helper script injects token
+if [ -n "${GITLAB_TOKEN:-}" ]; then
+    cat > /home/botuser/.git-credential-gitlab <<CREDEOF
+#!/bin/bash
+echo "username=${GL_USERNAME}"
+echo "password=${GITLAB_TOKEN}"
+CREDEOF
+    chmod 700 /home/botuser/.git-credential-gitlab
+    git config --global credential.https://gitlab.cee.redhat.com.helper "/home/botuser/.git-credential-gitlab"
 fi
-
-if [ -n "${GITLAB_SSH_KEY_B64:-}" ]; then
-    decode_or_raw "$GITLAB_SSH_KEY_B64" > ~/.ssh/id_gl
-    chmod 600 ~/.ssh/id_gl
-    unset GITLAB_SSH_KEY_B64
-fi
-
-# Generate SSH config — PROXY_HOST defaults to "proxy" (matches docker-compose service name)
-PROXY_HOST="${PROXY_HOST:-proxy}"
-cat > ~/.ssh/config <<SSHEOF
-Host github.com
-  HostName github.com
-  User git
-  IdentityFile /home/botuser/.ssh/id_gh
-  IdentitiesOnly yes
-  StrictHostKeyChecking accept-new
-  ProxyCommand socat - PROXY:${PROXY_HOST}:%h:%p,proxyport=3128
-
-Host gitlab.cee.redhat.com
-  IdentityFile /home/botuser/.ssh/id_gl
-  IdentitiesOnly yes
-  StrictHostKeyChecking accept-new
-  ProxyCommand socat - PROXY:${PROXY_HOST}:%h:%p,proxyport=3128
-SSHEOF
-chmod 600 ~/.ssh/config
 
 # Write SSO credentials file for stage auth (chrome-devtools)
 if [ -n "${SSO_USERNAME:-}" ] && [ -n "${SSO_PASSWORD:-}" ]; then
@@ -68,12 +49,65 @@ EOF
     unset SSO_USERNAME SSO_PASSWORD
 fi
 
-# Import GPG key for commit signing
+# Import GPG keys for commit signing (may contain keys for both platforms)
 if [ -n "${GPG_PRIVATE_KEY_B64:-}" ]; then
     gpg --batch --import <(decode_or_raw "$GPG_PRIVATE_KEY_B64") 2>/dev/null
 fi
-export GPG_SIGNING_KEY="$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep ed25519 | head -1 | awk '{print $2}' | cut -d/ -f2)"
-git config --global user.signingkey "$GPG_SIGNING_KEY"
+
+# Per-platform git identity via includeIf (git 2.36+)
+# Each platform gets its own name, email, and GPG signing key.
+GH_GPG_KEY="$(gpg --list-secret-keys --keyid-format long "${GH_USER_EMAIL}" 2>/dev/null | grep -oP '(?<=/)[A-F0-9]{16}' | head -1)"
+GL_GPG_KEY="$(gpg --list-secret-keys --keyid-format long "${GL_USER_EMAIL}" 2>/dev/null | grep -oP '(?<=/)[A-F0-9]{16}' | head -1)"
+
+cat > /home/botuser/.gitconfig-gh <<EOF
+[user]
+	name = ${GH_USER_NAME}
+	email = ${GH_USER_EMAIL}
+	signingkey = ${GH_GPG_KEY}
+EOF
+
+cat > /home/botuser/.gitconfig-gl <<EOF
+[user]
+	name = ${GL_USER_NAME}
+	email = ${GL_USER_EMAIL}
+	signingkey = ${GL_GPG_KEY}
+EOF
+
+git config --global 'includeIf.hasconfig:remote.*.url:https://github.com/**.path' /home/botuser/.gitconfig-gh
+git config --global 'includeIf.hasconfig:remote.*.url:https://gitlab.cee.redhat.com/**.path' /home/botuser/.gitconfig-gl
+
+# Verify per-platform identity + GPG signing (warn-only, never fatal)
+verify_platform_signing() {
+    local platform="$1" url="$2" expected_email="$3"
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    git init -q "$tmpdir"
+    git -C "$tmpdir" remote add origin "$url"
+    local resolved_email resolved_key
+    resolved_email=$(git -C "$tmpdir" config user.email)
+    resolved_key=$(git -C "$tmpdir" config user.signingkey)
+    rm -rf "$tmpdir"
+
+    if [ -z "$resolved_email" ]; then
+        echo "WARNING: ${platform} — includeIf did not resolve identity"
+        return
+    fi
+    if [ "$resolved_email" != "$expected_email" ]; then
+        echo "WARNING: ${platform} — email mismatch: got ${resolved_email}, expected ${expected_email}"
+        return
+    fi
+    if [ -z "$resolved_key" ]; then
+        echo "WARNING: ${platform} — no GPG signing key resolved"
+        return
+    fi
+    if echo "test" | gpg --local-user "$resolved_key" --sign > /dev/null 2>&1; then
+        echo "${platform} identity + GPG signing OK (${resolved_email})"
+    else
+        echo "WARNING: ${platform} — GPG key cannot sign (missing or expired)"
+    fi
+}
+verify_platform_signing "GitHub" "https://github.com/test/repo.git" "${GH_USER_EMAIL}"
+verify_platform_signing "GitLab" "https://gitlab.cee.redhat.com/test/repo.git" "${GL_USER_EMAIL}"
 
 # Decode GCP service account key
 if [ -n "${GOOGLE_SA_KEY_B64:-}" ]; then
@@ -83,14 +117,15 @@ fi
 # Point MCP config to the memory server
 sed -i "s|http://localhost:8080/mcp|${BOT_MEMORY_URL}|" .mcp.json
 
-# Configure gh CLI auth
+# Configure gh CLI auth (HTTPS + credential helper for git)
 mkdir -p ~/.config/gh
 cat > ~/.config/gh/hosts.yml <<EOF
 github.com:
     oauth_token: ${GH_TOKEN}
-    user: platex-rehor-bot
-    git_protocol: ssh
+    user: ${GH_USERNAME}
+    git_protocol: https
 EOF
+gh auth setup-git 2>/dev/null || true
 
 # Remove token from env — gh uses the config file from now on
 unset GH_TOKEN
@@ -99,7 +134,7 @@ unset GH_TOKEN
 if [ -n "${GITLAB_TOKEN:-}" ]; then
     mkdir -p ~/.config/glab-cli
     cat > ~/.config/glab-cli/config.yml <<EOF
-git_protocol: ssh
+git_protocol: https
 check_update: false
 no_prompt: true
 host: gitlab.cee.redhat.com
@@ -108,7 +143,7 @@ hosts:
         token: ${GITLAB_TOKEN}
         api_protocol: https
         api_host: gitlab.cee.redhat.com
-        git_protocol: ssh
+        git_protocol: https
         skip_tls_verify: true
 EOF
     chmod 600 ~/.config/glab-cli/config.yml
@@ -162,5 +197,5 @@ CHROME_BIN=$(find "$PLAYWRIGHT_BROWSERS_PATH" -name chrome -type f | head -1)
 # Wait for Chromium to be ready
 until curl -s http://127.0.0.1:9222/json/version > /dev/null 2>&1; do sleep 1; done
 
-echo "Keys loaded. Chromium started. Starting bot with label: ${BOT_LABEL}"
+echo "Credentials configured. Chromium started. Starting bot with label: ${BOT_LABEL}"
 exec uv run dev-bot --label "$BOT_LABEL"

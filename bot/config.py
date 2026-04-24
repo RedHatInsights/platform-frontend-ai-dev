@@ -83,26 +83,31 @@ SECRET_ENV_VARS = [
     "GH_TOKEN",
     "GITHUB_TOKEN",
     "GITLAB_TOKEN",
-    "SSH_PRIVATE_KEY_B64",
     "GPG_PRIVATE_KEY_B64",
     "GOOGLE_SA_KEY_B64",
-    "BOT_SSH_KEY",
-    "GITLAB_SSH_KEY",
-    "GITLAB_SSH_KEY_B64",
-    "GITLAB_SSH_PASSPHRASE",
     "GPG_SIGNING_KEY",
     "SSO_USERNAME",
     "SSO_PASSWORD",
 ]
 
 
+# Git env vars that override gitconfig — must be removed so
+# includeIf per-platform identity works correctly.
+GIT_OVERRIDE_VARS = [
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+]
+
+
 def sanitize_env() -> None:
-    """Remove secret env vars so Bash subprocesses can't leak them.
+    """Remove secret and git-override env vars before starting the agent.
 
     Call this AFTER load_mcp_servers() (which resolves ${VAR} references)
     and after gh/glab auth setup (which writes tokens to config files).
     """
-    for var in SECRET_ENV_VARS:
+    for var in SECRET_ENV_VARS + GIT_OVERRIDE_VARS:
         os.environ.pop(var, None)
 
 
