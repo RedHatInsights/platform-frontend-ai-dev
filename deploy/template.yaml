@@ -21,18 +21,12 @@ parameters:
   value: hcc-ai-bot
 - name: BOT_REPLICAS
   value: "1"
-- name: GH_USER_NAME
-  required: true
-- name: GH_USER_EMAIL
-  required: true
-- name: GH_USERNAME
-  required: true
-- name: GL_USER_NAME
-  required: true
-- name: GL_USER_EMAIL
-  required: true
-- name: GL_USERNAME
-  required: true
+- name: BOT_BOARD_NAME
+  value: ""
+- name: BOT_INCLUDE_BACKLOG
+  value: "false"
+- name: BOT_INSTANCE_ID
+  value: ""
 objects:
 
 # ============================================================================
@@ -40,9 +34,13 @@ objects:
 #
 # 1. RDS instance with the pgvector extension enabled
 # 2. Secret "devbot-secrets" (Vault) with the following keys:
-#      gh-bot-private-key    — SSH private key (base64)
+#      bot-gh-username       — GitHub username / git name
+#      bot-email             — GitHub email for git commits
+#      bot-gl-name           — GitLab username / git name
+#      bot-gl-email          — GitLab email for git commits
 #      gh-bot-gpg-private    — GPG private key (base64)
 #      gh-bot-cli-token      — GitHub personal access token
+#      gl-bot-cli-token      — GitLab personal access token
 #      gcp-vertex-claude-sa  — Google service account key (base64)
 #      jira-email            — Jira username/email
 #      jira-token            — Jira API token
@@ -269,19 +267,48 @@ objects:
             value: "60"
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /home/botuser/sa-key.json
-          # Git identity — per-platform (name, email, login)
+          # Git identity — per-platform (from Vault)
           - name: GH_USER_NAME
-            value: ${GH_USER_NAME}
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: bot-gh-username
           - name: GH_USER_EMAIL
-            value: ${GH_USER_EMAIL}
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: bot-email
           - name: GH_USERNAME
-            value: ${GH_USERNAME}
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: bot-gh-username
           - name: GL_USER_NAME
-            value: ${GL_USER_NAME}
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: bot-gl-name
           - name: GL_USER_EMAIL
-            value: ${GL_USER_EMAIL}
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: bot-gl-email
           - name: GL_USERNAME
-            value: ${GL_USERNAME}
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: bot-gl-name
+          # Bot config
+          - name: BOT_BOARD_NAME
+            value: ${BOT_BOARD_NAME}
+          - name: BOT_INCLUDE_BACKLOG
+            value: ${BOT_INCLUDE_BACKLOG}
+          - name: BOT_INSTANCE_ID
+            value: ${BOT_INSTANCE_ID}
+          - name: BOT_DASHBOARD_URL
+            value: http://devbot-memory-server:8080/api/bot-status
+          - name: COSTS_API_URL
+            value: http://devbot-memory-server:8080/api/costs
           # Proxy — HTTP(S)_PROXY for git and HTTP clients
           - name: PROXY_HOST
             value: devbot-proxy
