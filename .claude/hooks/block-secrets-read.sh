@@ -47,6 +47,16 @@ if echo "$FILE_PATH" | grep -qE '(^|/)\.env(\.|$)'; then
   deny "BLOCKED: Reading .env files is not allowed."
 fi
 
+# Block reading Jira credentials file
+if echo "$FILE_PATH" | grep -qE '(^|/)\.jira-credentials$'; then
+  deny "BLOCKED: Reading Jira credentials file is not allowed."
+fi
+
+# Block reading glab CLI config (contains token)
+if echo "$FILE_PATH" | grep -qE '\.config/glab-cli/'; then
+  deny "BLOCKED: Reading GitLab CLI config is not allowed (contains auth token)."
+fi
+
 # Block reading AWS credentials
 if echo "$FILE_PATH" | grep -qE '\.aws/(credentials|config)'; then
   deny "BLOCKED: Reading AWS credential files is not allowed."

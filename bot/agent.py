@@ -158,6 +158,7 @@ async def run_cycle(
     prompt = (
         f"Your primary label is: {label}.{instance_line} "
         "Follow the instructions in CLAUDE.md. "
+        "Start by invoking the /triage skill to pre-gather task and PR data. "
         "IMPORTANT: Use ULTRA caveman output for all internal text — "
         "drop articles, filler, hedging, conjunctions. Abbreviate: DB/auth/config/req/res/fn/impl/env/dep/pkg. "
         "Arrows for causality (X → Y). One word when one word enough. "

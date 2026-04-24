@@ -80,6 +80,14 @@ if [ -n "${GOOGLE_SA_KEY_B64:-}" ]; then
     decode_or_raw "$GOOGLE_SA_KEY_B64" > /home/botuser/sa-key.json
 fi
 
+# Write Jira credentials file for triage skill (same pattern as gh/glab config files)
+if [ -n "${JIRA_URL:-}" ] && [ -n "${JIRA_USERNAME:-}" ] && [ -n "${JIRA_API_TOKEN:-}" ]; then
+    cat > ~/.jira-credentials <<EOF
+{"url": "${JIRA_URL}", "username": "${JIRA_USERNAME}", "token": "${JIRA_API_TOKEN}"}
+EOF
+    chmod 600 ~/.jira-credentials
+fi
+
 # Point MCP config to the memory server
 sed -i "s|http://localhost:8080/mcp|${BOT_MEMORY_URL}|" .mcp.json
 

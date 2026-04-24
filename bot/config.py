@@ -108,7 +108,7 @@ def sanitize_env() -> None:
 
 ALLOWED_TOOLS = [
     # Built-in tools
-    "Edit", "Write", "Read", "Glob", "Grep", "Bash", "LSP",
+    "Edit", "Write", "Read", "Glob", "Grep", "Bash", "LSP", "Skill",
     # Jira MCP tools
     "mcp__mcp-atlassian__jira_search",
     "mcp__mcp-atlassian__jira_get_issue",

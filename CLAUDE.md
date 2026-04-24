@@ -155,17 +155,19 @@ ONE item per cycle. Priority order:
 - Cycle end: `idle`, "Cycle complete. Sleeping..." or "No work found. Sleeping..."
 - Error: `error`, "<what went wrong>"
 
+### Triage (start of every cycle)
+
+Invoke `/triage` skill first. It runs a script that pre-gathers all active tasks, PR/MR statuses (state, CI, reviews, merge conflicts), Jira comments, PR comments, and capacity — grouped by action bucket (MERGED, CI_FAIL, CONFLICTS, FEEDBACK, INTERRUPTED, CLEAN).
+
+Do NOT re-fetch this data. Do NOT call `task_list`, `jira_get_issue`, or `gh pr view` for tasks already in the triage output. If any ticket shows `[jira unavailable]`, use `jira_get_issue` MCP tool for those only.
+
 ### Priority 0: Resume + Respond to Feedback
 
-`task_list` → get all active tasks. **MUST check ALL for feedback before triaging:**
-
-- EVERY `in_progress`/`pr_open`/`pr_changes` task: call `jira_get_issue` → read ALL comments → determine unaddressed
-- Open PRs: also check PR/MR comments via `gh api`/`glab mr view`
-- Build list of tasks w/ unaddressed feedback BEFORE deciding what to work on
+Use triage output to identify tasks with unaddressed feedback. Do NOT re-fetch data already in triage output.
 
 **CRITICAL — Shared Jira identity**: Bot shares Jira creds with human operator → same author. CANNOT filter by author. Identify bot comments by **content patterns**: structured reports (### headers), grype scan tables, PR links, status updates, duplicate notices. Short conversational comments ("Hello bot, can you verify...", "Can you check...") = human. **When in doubt → treat as human feedback.**
 
-**Do NOT skip.** Do NOT short-circuit via metadata. Must fetch Jira comments. Investigation tasks (`last_step = "investigation_posted"`) especially important — humans reply days later.
+Investigation tasks (`last_step = "investigation_posted"`) especially important — humans reply days later.
 
 Triage buckets (first match wins):
 
@@ -179,32 +181,14 @@ None apply → Priority 1.
 
 ### Priority 1: Maintain Existing PRs
 
-For each `pr_open`/`pr_changes` task (check `metadata.prs` for multi-repo, else `repo`/`pr_number`/`pr_url`):
+PR statuses are in the triage output. For each `pr_open`/`pr_changes` task:
 
 0. **Reload persona**: Read `personas/<name>/prompt.md` for repo tech stack (same logic as step 6). Has CI fix patterns + sequencing rules.
 1. `cd` repo dir. `git fetch origin`. Fork? Also `git fetch upstream`.
 2. Check `host` in `project-repos.json` → `gh` (GitHub) or `glab` (GitLab). **ALL `glab` commands MUST include `--hostname gitlab.cee.redhat.com`** — without it, glab defaults to `gitlab.com` which is blocked. Fork repos: `glab mr` needs `--repo <upstream-project-path>`.
-3. PR status:
-   - GH: `gh pr view <n> --json state,mergeable,statusCheckRollup,reviewDecision,reviews,url`
-   - GL: Use the API for full status (glab mr view lacks structured data):
-     ```
-     glab api "projects/<url-encoded-path>/merge_requests/<n>" --hostname gitlab.cee.redhat.com
-     ```
-     URL-encode the project path: `service/app-interface` → `service%2Fapp-interface`.
-     Key fields in the response:
-     - `state`: "opened", "merged", "closed"
-     - `merge_status` / `detailed_merge_status`: "can_be_merged", "cannot_be_merged", "unchecked"
-     - `has_conflicts`: true/false — if true, needs rebase
-     - `head_pipeline.status`: "success", "failed", "running", "pending"
-     - `blocking_discussions_resolved`: false = unresolved threads block merge
-     - `draft`: true = WIP, not ready for merge
-     
-     For CI details: `glab api "projects/<path>/merge_requests/<n>/pipelines" --hostname gitlab.cee.redhat.com`
-     For approvals: `glab api "projects/<path>/merge_requests/<n>/approvals" --hostname gitlab.cee.redhat.com`
+3. **Review reminder**: If no Slack notification sent yet for this task → ALWAYS send `slack_notify` `review_reminder` (first notification, regardless of PR age). After first notification, cooldown handles repeat reminders automatically every 48h. **Bot reviews don't count** — only human reviews matter. PR with only bot reviews = still needs human review → send reminder.
 
-4. **Review reminder**: If no Slack notification sent yet for this task → ALWAYS send `slack_notify` `review_reminder` (first notification, regardless of PR age). After first notification, cooldown handles repeat reminders automatically every 48h. **Bot reviews don't count** — only human reviews matter. PR with only bot reviews = still needs human review → send reminder.
-
-5. Handle in order:
+4. Handle in order:
 
 **Failing CI**: `gh pr checks <n>` / `glab api "projects/<path>/merge_requests/<n>/pipelines" --hostname gitlab.cee.redhat.com`. Checkout branch → fix → commit → push. Comment on Jira. `task_update` `last_addressed`.
 
@@ -244,14 +228,9 @@ Handle one PR issue → stop. Next cycle picks up next.
 
 ### Priority 1.5: Check Assigned Tickets
 
-JQL:
-```
-project = RHCLOUD AND labels = PRIMARY_LABEL AND assignee = currentUser() AND status NOT IN (Done, "Release Pending") ORDER BY updated DESC
-```
-
-For each:
-1. **Merged PRs?** `gh pr list --head bot/<KEY> --state merged` / `glab mr list --source-branch bot/<KEY> --merged --hostname gitlab.cee.redhat.com`. If merged → transition "Release Pending", Jira comment, `task_update` archived, `memory_store`.
-2. **New Jira comments?** `jira_get_issue` → check for unaddressed comments since `last_addressed`. Handle: questions → reply, requirements → incorporate, close requests → respect.
+Triage output covers task statuses, PR states, and Jira comments. Use it to identify:
+1. **Merged PRs?** If triage shows `state=MERGED` → transition "Release Pending", Jira comment, `task_update` archived, `memory_store`.
+2. **New Jira comments?** Visible in triage output. Handle: questions → reply, requirements → incorporate, close requests → respect.
 3. PR still open, no comments → skip (Priority 1 handles).
 
 One ticket/cycle → stop.
@@ -409,7 +388,7 @@ Keep task record updated throughout (not just end). `task_update` w/ `summary` +
 - `last_step`: `branch_created`/`implemented`/`tests_passing`/`push_failed`/`pr_opened`/`review_addressed`/`investigation_posted`/`archived`
 - `files_changed`, `commits`, `next_step`, `notes`, `repos`, `prs`
 
-**On startup — interrupted work**: `task_list` → any `in_progress` w/ `last_step`? → `memory_search` repo + problem → resume from `next_step`. Task metadata = specific work state. RAG memory = cross-ticket learnings.
+**On startup — interrupted work**: Triage output shows all `in_progress` tasks w/ `last_step`. Any w/ `last_step` set? → `memory_search` repo + problem → resume from `next_step`. Task metadata = specific work state. RAG memory = cross-ticket learnings.
 
 ## Rules
 
