@@ -33,6 +33,19 @@ def http_get(url, headers=None, timeout=10):
         return None
 
 
+def http_post(url, body, headers=None, timeout=10):
+    data = json.dumps(body).encode()
+    hdrs = dict(headers or {})
+    hdrs["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=hdrs, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        print(f"ERR POST {url}: {e}", file=sys.stderr)
+        return None
+
+
 def jira_auth():
     if not JIRA_CREDS.exists():
         print(f"WARN: {JIRA_CREDS} not found", file=sys.stderr)
@@ -55,12 +68,13 @@ def jira_search(jql, limit=10):
     url, headers = jira_auth()
     if not url:
         return []
-    encoded = urllib.parse.urlencode({
+    fields = ["summary", "status", "labels", "assignee", "priority",
+              "description", "comment", "issuelinks", "issuetype"]
+    data = http_post(f"{url}/rest/api/2/search/jql", {
         "jql": jql,
         "maxResults": limit,
-        "fields": "summary,status,labels,assignee,priority,description,comment,issuelinks,issuetype",
-    })
-    data = http_get(f"{url}/rest/api/2/search?{encoded}", headers=headers, timeout=20)
+        "fields": fields,
+    }, headers=headers, timeout=20)
     if not data:
         print("ERR: Jira search returned no data", file=sys.stderr)
         return []
