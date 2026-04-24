@@ -133,7 +133,7 @@ def upstream_repo(repo_name):
         host = parsed.hostname or ""
         if host == "github.com":
             return _parse_repo_path(up), "github"
-        if host.endswith("gitlab.com") or host.endswith("gitlab.cee.redhat.com"):
+        if host in ("gitlab.com", "gitlab.cee.redhat.com"):
             return _parse_repo_path(up), "gitlab"
     except Exception:
         pass
