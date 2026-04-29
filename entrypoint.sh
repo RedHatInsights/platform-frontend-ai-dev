@@ -165,7 +165,7 @@ echo "Verifying GitLab auth..."
 glab auth status --hostname gitlab.cee.redhat.com 2>&1 | head -3 || { echo "WARNING: glab auth failed"; }
 
 # --- Wait for dependent services (OpenShift deploys all pods concurrently) ---
-wait_for() {
+wait_for_http() {
     local name="$1" url="$2" timeout="${3:-120}"
     echo "Waiting for ${name} at ${url} (timeout=${timeout}s)..."
     local elapsed=0
@@ -180,14 +180,31 @@ wait_for() {
     echo "${name} is ready."
 }
 
+wait_for_tcp() {
+    local name="$1" host="$2" port="$3" timeout="${4:-120}"
+    echo "Waiting for ${name} at ${host}:${port} (timeout=${timeout}s)..."
+    local elapsed=0
+    until bash -c "echo > /dev/tcp/${host}/${port}" 2>/dev/null; do
+        elapsed=$((elapsed + 2))
+        if [ "$elapsed" -ge "$timeout" ]; then
+            echo "FATAL: ${name} not ready after ${timeout}s" >&2
+            exit 1
+        fi
+        sleep 2
+    done
+    echo "${name} is ready."
+}
+
 # Proxy must be up before Chromium (which routes through it)
-if [ -n "${BOT_PROXY_HEALTH_URL:-}" ]; then
-    wait_for "proxy" "$BOT_PROXY_HEALTH_URL" "${BOT_PROXY_HEALTH_TIMEOUT:-60}"
+# Uses TCP check — Squid doesn't serve HTTP on its proxy port
+# TODO: update template to replace BOT_PROXY_HEALTH_URL with PROXY_HOST/PROXY_PORT
+if [ -n "${PROXY_HOST:-}" ]; then
+    wait_for_tcp "proxy" "$PROXY_HOST" "${PROXY_PORT:-3128}" "${BOT_PROXY_HEALTH_TIMEOUT:-60}"
 fi
 
 # Memory server must be up before the bot connects via MCP
 if [ -n "${BOT_MEMORY_HEALTH_URL:-}" ]; then
-    wait_for "memory-server" "$BOT_MEMORY_HEALTH_URL" "${BOT_MEMORY_HEALTH_TIMEOUT:-120}"
+    wait_for_http "memory-server" "$BOT_MEMORY_HEALTH_URL" "${BOT_MEMORY_HEALTH_TIMEOUT:-120}"
 fi
 
 # Start headless Chromium in background (Playwright-installed binary)
