@@ -175,15 +175,15 @@ Copy `.env.example` to `.env` and fill in your credentials. All identity and aut
 
 **Git identity** — set `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` to commit as the bot account. If unset, your local git config is used.
 
-**GPG signing** — import the bot's GPG key (`gpg --import <key-file>`), then set `GPG_SIGNING_KEY` to the key ID. If unset, commits are not signed.
-
-**SSH keys** — set `BOT_SSH_KEY` and/or `GITLAB_SSH_KEY` to route git traffic through specific keys per host. Paths can be absolute or relative to the repo root. If unset, your default SSH agent is used.
+**GPG signing** — import the bot's GPG key (`gpg --import <key-file>`), then set `GPG_SIGNING_KEY` to the key ID. If unset, commits are not signed. In Docker, GPG keys are imported automatically in the proxy container from `GPG_PRIVATE_KEY_B64`.
 
 **CLI auth** — set `GH_TOKEN` and/or `GITLAB_TOKEN`, or log in manually:
 ```bash
 gh auth login                                       # GitHub
 glab auth login --hostname gitlab.cee.redhat.com    # GitLab
 ```
+
+> **Note**: In Docker, CLI credentials (`GH_TOKEN`, `GITLAB_TOKEN`, `GPG_PRIVATE_KEY_B64`) are injected into the **proxy container**, not the bot. The bot uses thin client shims that forward CLI commands to the proxy over gRPC. See [Architecture](#architecture-credential-isolation).
 
 #### 2. Start the services
 
@@ -197,13 +197,16 @@ make run LABEL=hcc-ai-framework
 
 ### Option B: Full stack in Docker
 
-For production-like deployments or CI — everything runs in containers with dedicated bot credentials:
+For production-like deployments or CI — everything runs in containers with credential isolation (see [Architecture](#architecture-credential-isolation)):
 
 ```bash
 # Set secrets (or add to .env — see SOP.md for details)
-export SSH_PRIVATE_KEY_B64=$(base64 -i .ssh/id_ed25519)
-export GPG_PRIVATE_KEY_B64=$(base64 -i .ssh/gpg-private.asc)
+# CLI tokens + GPG key → proxy container (credential isolation)
 export GH_TOKEN=<your-pat>
+export GITLAB_TOKEN=<your-gitlab-pat>
+export GPG_PRIVATE_KEY_B64=$(base64 -i .ssh/gpg-private.asc)
+
+# SA key + Jira token → bot container (not yet isolated)
 export GOOGLE_SA_KEY_B64=$(base64 -i sa-key.json)
 
 # Start everything
@@ -308,6 +311,54 @@ make costs-week      # Last 7 days
 
 The dashboard at http://localhost:8080 also shows cost charts with per-cycle breakdowns by work type.
 
+## Architecture: Credential Isolation
+
+The bot uses a **defense-in-depth** model to prevent credential leakage. Secrets never enter the bot container — all credential-bearing operations are proxied through a separate **proxy container**.
+
+```
+Bot Container                          Proxy Container
++----------------------------+         +----------------------------+
+| Claude Agent SDK           |         | Squid (port 3128)          |
+|                            |         |   domain allowlist         |
+| thin client (Go binary)   |         | executor-server (gRPC 9090)|
+|   /usr/local/bin/gh  ------+--TCP--->|   policy allowlist check   |
+|   /usr/local/bin/glab -----+--TCP--->|   exec gh-real / glab-real |
+|   /usr/local/bin/gpg ------+--TCP--->|   exec gpg (signing)       |
+|                            |         |   tokens in config files   |
+| git push                   |         |                            |
+|   credential helper -------+--TCP--->|   gh auth git-credential   |
++----------------------------+         +----------------------------+
+```
+
+### How it works
+
+- **CLI tools** (`gh`, `glab`, `gpg`) in the bot container are **thin client shims** — a single Go binary (hardlinked as `gh`, `glab`, `gpg`) that detects the tool name from `argv[0]` and forwards commands over gRPC to the proxy's executor server.
+- The **executor server** validates commands against a built-in **policy allowlist** (e.g. `gh pr create` is allowed, `gh auth token` is blocked), then executes the real CLI binary with full credentials.
+- **Git credential helpers** are configured globally so `git push` transparently authenticates via the thin client → proxy path.
+- **GPG commit signing** works the same way — git invokes `gpg --sign` which routes through the thin client to the proxy's GPG keyring.
+- **HTTP/HTTPS traffic** is routed through Squid with a domain allowlist — the bot container has no direct internet access.
+- **Bash hooks** (`.claude/hooks/validate-bash.sh`) block dangerous commands (curl, eval, credential reads) as an additional defense layer.
+
+### What lives where
+
+| Component | Bot Container | Proxy Container |
+|-----------|:---:|:---:|
+| GH_TOKEN / GITLAB_TOKEN | - | yes |
+| GPG private key | - | yes |
+| gh / glab CLIs (real) | - | yes |
+| gh / glab / gpg (thin client) | yes | - |
+| Squid proxy | - | yes |
+| Agent SDK + bot code | yes | - |
+| Google SA key | yes* | - |
+| Jira API token | yes* | - |
+
+\* SA key and Jira token still reside in the bot container today. Planned isolation: [RHCLOUD-47293](https://redhat.atlassian.net/browse/RHCLOUD-47293) (Vertex AI proxy) and [RHCLOUD-47287](https://redhat.atlassian.net/browse/RHCLOUD-47287) (MCP air-lock for Jira).
+
+### Deployment
+
+- **OpenShift**: Bot and proxy run as separate pods connected via ClusterIP Service. A `NetworkPolicy` restricts bot egress to the proxy and memory-server pods only.
+- **Docker Compose**: Bot and proxy run as separate containers on an internal network. A shared tmpfs volume provides a Unix Domain Socket for the executor, and docker-compose networking handles TCP communication. Only the proxy container is on the external network.
+
 ## Project structure
 
 ```
@@ -327,6 +378,17 @@ dev-bot/
   init.sh                # Installs LSP, downloads BrowserMCP, starts memory server
   costs.sh               # Cost report CLI
   start-chromium.sh      # Launch Chrome with remote debugging
+  proxy/                 # Credential-bearing proxy (Squid + executor)
+    Dockerfile           # Squid + gh-real/glab-real + executor binaries
+    squid.conf           # Domain allowlist
+    start.sh             # Process manager (Squid + executor-server)
+    executor/            # gRPC executor module (Go)
+      proto/             # Protobuf service definition
+      gen/               # Generated gRPC code
+      cmd/server/        # Executor server binary
+      cmd/client/        # Thin client binary (hardlinked as gh/glab/gpg)
+      policy.go          # Command allowlist engine
+      policy_test.go     # Allowlist tests
   memory-server/         # Persistent memory + task tracking
     src/
       server.py          # FastMCP + Starlette + WebSocket
@@ -341,8 +403,10 @@ dev-bot/
     operator/            # Kubernetes operator
     config/              # Config repo
     cve/                 # CVE remediation
+    tooling/             # Dockerfiles, scripts, proxy configs
   prompts/               # Interactive prompts (grooming, etc.)
   dashboard/             # Dashboard source (React + Vite + TypeScript)
+  deploy/                # OpenShift deployment template
   repos/                 # Cloned target repos (created on demand)
   scripts/               # Utility scripts
 ```

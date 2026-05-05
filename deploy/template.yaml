@@ -154,7 +154,7 @@ objects:
       protocol: TCP
       name: http
 
-# --- Proxy Deployment ---
+# --- Proxy Deployment (Squid + Executor server — holds all CLI secrets) ---
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
@@ -187,6 +187,37 @@ objects:
           - containerPort: 3128
             name: squid
             protocol: TCP
+          - containerPort: 9090
+            name: executor
+            protocol: TCP
+          env:
+          - name: EXECUTOR_LISTEN
+            value: ":9090"
+          - name: GH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: gh-bot-cli-token
+          - name: GH_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: bot-gh-username
+          - name: GITLAB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: gl-bot-cli-token
+          - name: GL_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: bot-gl-name
+          - name: GPG_PRIVATE_KEY_B64
+            valueFrom:
+              secretKeyRef:
+                name: devbot-secrets
+                key: gh-bot-gpg-private
           livenessProbe:
             tcpSocket:
               port: 3128
@@ -199,11 +230,11 @@ objects:
             periodSeconds: 10
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
+              cpu: 100m
               memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
 
 # --- Proxy Service ---
 - apiVersion: v1
@@ -222,6 +253,10 @@ objects:
       targetPort: squid
       protocol: TCP
       name: squid
+    - port: 9090
+      targetPort: executor
+      protocol: TCP
+      name: executor
 
 # --- Bot Deployment ---
 - apiVersion: apps/v1
@@ -261,12 +296,11 @@ objects:
             value: http://devbot-memory-server:8080/health
           - name: BOT_MEMORY_HEALTH_TIMEOUT
             value: "120"
-          - name: BOT_PROXY_HEALTH_URL
-            value: http://devbot-proxy:3128
-          - name: BOT_PROXY_HEALTH_TIMEOUT
-            value: "60"
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /home/botuser/sa-key.json
+          # Executor — thin client connects to proxy over TCP
+          - name: EXECUTOR_ADDR
+            value: devbot-proxy:9090
           # Git identity — per-platform (from Vault)
           - name: GH_USER_NAME
             valueFrom:
@@ -278,11 +312,6 @@ objects:
               secretKeyRef:
                 name: devbot-secrets
                 key: bot-email
-          - name: GH_USERNAME
-            valueFrom:
-              secretKeyRef:
-                name: devbot-secrets
-                key: bot-gh-username
           - name: GL_USER_NAME
             valueFrom:
               secretKeyRef:
@@ -293,11 +322,6 @@ objects:
               secretKeyRef:
                 name: devbot-secrets
                 key: bot-gl-email
-          - name: GL_USERNAME
-            valueFrom:
-              secretKeyRef:
-                name: devbot-secrets
-                key: bot-gl-name
           # Bot config
           - name: BOT_BOARD_NAME
             value: ${BOT_BOARD_NAME}
@@ -309,7 +333,7 @@ objects:
             value: http://devbot-memory-server:8080/api/bot-status
           - name: COSTS_API_URL
             value: http://devbot-memory-server:8080/api/costs
-          # Proxy — HTTP(S)_PROXY for git and HTTP clients
+          # Proxy — separate pod
           - name: PROXY_HOST
             value: devbot-proxy
           - name: HTTP_PROXY
@@ -321,25 +345,10 @@ objects:
           - name: https_proxy
             value: http://devbot-proxy:3128
           - name: NO_PROXY
-            value: devbot-memory-server,localhost,127.0.0.1
+            value: devbot-memory-server,devbot-proxy,localhost,127.0.0.1
           - name: no_proxy
-            value: devbot-memory-server,localhost,127.0.0.1
-          # Secrets from Vault (devbot-secrets)
-          - name: GPG_PRIVATE_KEY_B64
-            valueFrom:
-              secretKeyRef:
-                name: devbot-secrets
-                key: gh-bot-gpg-private
-          - name: GH_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: devbot-secrets
-                key: gh-bot-cli-token
-          - name: GITLAB_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: devbot-secrets
-                key: gl-bot-cli-token
+            value: devbot-memory-server,devbot-proxy,localhost,127.0.0.1
+          # Secrets that stay in bot container (GCP for Vertex AI, Jira for MCP, SSO for E2E)
           - name: GOOGLE_SA_KEY_B64
             valueFrom:
               secretKeyRef:
@@ -376,3 +385,44 @@ objects:
               cpu: "4"
               memory: 4Gi
               ephemeral-storage: 8Gi
+
+# --- NetworkPolicy: Bot can only reach proxy + memory-server ---
+- apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    name: devbot-bot-egress
+    labels:
+      app.kubernetes.io/part-of: devbot
+  spec:
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: bot
+    policyTypes:
+    - Egress
+    egress:
+    - to:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: proxy
+      ports:
+      - port: 3128
+        protocol: TCP
+      - port: 9090
+        protocol: TCP
+    - to:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: memory-server
+      ports:
+      - port: 8080
+        protocol: TCP
+    - to:
+      - namespaceSelector: {}
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
+      ports:
+      - port: 53
+        protocol: UDP
+      - port: 53
+        protocol: TCP

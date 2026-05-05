@@ -1,0 +1,19 @@
+syntax = "proto3";
+package executor;
+option go_package = "github.com/RedHatInsights/platform-frontend-ai-dev/proxy/executor/gen";
+
+service Executor {
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+}
+
+message ExecuteRequest {
+  string tool = 1;
+  repeated string args = 2;
+  bytes stdin = 3;
+}
+
+message ExecuteResponse {
+  string stdout = 1;
+  string stderr = 2;
+  int32 exit_code = 3;
+}

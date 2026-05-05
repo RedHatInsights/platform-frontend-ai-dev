@@ -78,6 +78,16 @@ fi
 if echo "$COMMAND" | grep -qiE 'gh\s+auth\s+(token|status\s+.*(--show-token|-t)|refresh|login)'; then
   deny "gh auth token/refresh/login/status-show-token is blocked."
 fi
+# Block standalone gh auth git-credential — token leaks via stdout.
+# Git calls it internally via credential.helper config (not via Bash), so
+# blocking it here only prevents the bot from invoking it directly.
+if echo "$COMMAND" | grep -qiE 'gh\s+auth\s+git-credential'; then
+  deny "gh auth git-credential is blocked — git handles credentials automatically via the global credential helper."
+fi
+# Block standalone glab credential-helper — same token leak risk as gh auth git-credential.
+if echo "$COMMAND" | grep -qiE 'glab\s+credential-helper'; then
+  deny "glab credential-helper is blocked — git handles credentials automatically via the global credential helper."
+fi
 
 # --- DESTRUCTIVE OPERATIONS ---
 if echo "$COMMAND" | grep -qiE '(^|[\|;`&(]|\$\()\s*sudo\b'; then

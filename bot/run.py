@@ -75,6 +75,10 @@ def setup_git(script_dir: Path) -> None:
         "\tgpgsign = true",
         "[gpg]",
         "\tformat = openpgp",
+        '[credential "https://github.com"]',
+        "\thelper = !/usr/local/bin/gh auth git-credential",
+        '[credential "https://gitlab.cee.redhat.com"]',
+        "\thelper = !/usr/local/bin/glab credential-helper",
     ]
 
     config_path.write_text("\n".join(lines) + "\n")

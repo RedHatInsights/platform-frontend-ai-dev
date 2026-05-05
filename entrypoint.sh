@@ -27,18 +27,9 @@ decode_or_raw() {
     esac
 }
 
-# Git credential helpers for HTTPS auth (replaces SSH keys)
-# GitHub: gh CLI acts as credential helper (set up below)
-# GitLab: custom helper script injects token
-if [ -n "${GITLAB_TOKEN:-}" ]; then
-    cat > /home/botuser/.git-credential-gitlab <<CREDEOF
-#!/bin/bash
-echo "username=${GL_USERNAME}"
-echo "password=${GITLAB_TOKEN}"
-CREDEOF
-    chmod 700 /home/botuser/.git-credential-gitlab
-    git config --global credential.https://gitlab.cee.redhat.com.helper "/home/botuser/.git-credential-gitlab"
-fi
+# Git credential helpers — thin clients forward to executor sidecar in proxy container
+git config --global credential.https://github.com.helper '!/usr/local/bin/gh auth git-credential'
+git config --global credential.https://gitlab.cee.redhat.com.helper '!/usr/local/bin/glab credential-helper'
 
 # Write SSO credentials file for stage auth (chrome-devtools)
 if [ -n "${SSO_USERNAME:-}" ] && [ -n "${SSO_PASSWORD:-}" ]; then
@@ -49,15 +40,37 @@ EOF
     unset SSO_USERNAME SSO_PASSWORD
 fi
 
-# Import GPG keys for commit signing (may contain keys for both platforms)
-if [ -n "${GPG_PRIVATE_KEY_B64:-}" ]; then
-    gpg --batch --import <(decode_or_raw "$GPG_PRIVATE_KEY_B64") 2>/dev/null
+# --- Wait for executor (provides gh/glab/gpg via proxy) ---
+# Must be ready BEFORE GPG key lookups (gpg is a thin client to proxy)
+EXECUTOR_ADDR="${EXECUTOR_ADDR:-unix:///var/run/devbot/executor.sock}"
+echo "Waiting for executor at ${EXECUTOR_ADDR}..."
+elapsed=0
+if [[ "$EXECUTOR_ADDR" == unix://* ]]; then
+    SOCK_PATH="${EXECUTOR_ADDR#unix://}"
+    until [ -S "$SOCK_PATH" ]; do
+        elapsed=$((elapsed + 1))
+        [ "$elapsed" -ge 30 ] && { echo "FATAL: executor socket not ready after 30s" >&2; exit 1; }
+        sleep 1
+    done
+else
+    EXEC_HOST="${EXECUTOR_ADDR%%:*}"
+    EXEC_PORT="${EXECUTOR_ADDR##*:}"
+    until bash -c "echo > /dev/tcp/${EXEC_HOST}/${EXEC_PORT}" 2>/dev/null; do
+        elapsed=$((elapsed + 1))
+        [ "$elapsed" -ge 30 ] && { echo "FATAL: executor at ${EXECUTOR_ADDR} not ready after 30s" >&2; exit 1; }
+        sleep 1
+    done
 fi
+echo "Executor ready."
 
 # Per-platform git identity via includeIf (git 2.36+)
 # Each platform gets its own name, email, and GPG signing key.
 GH_GPG_KEY="$(gpg --list-secret-keys --keyid-format long "${GH_USER_EMAIL}" 2>/dev/null | grep -oP '(?<=/)[A-F0-9]{16}' | head -1)"
 GL_GPG_KEY="$(gpg --list-secret-keys --keyid-format long "${GL_USER_EMAIL}" 2>/dev/null | grep -oP '(?<=/)[A-F0-9]{16}' | head -1)"
+
+# Export so run.py's setup_git() writes them into GIT_CONFIG_GLOBAL gitconfig
+export GH_GPG_SIGNING_KEY="$GH_GPG_KEY"
+export GL_GPG_SIGNING_KEY="$GL_GPG_KEY"
 
 cat > /home/botuser/.gitconfig-gh <<EOF
 [user]
@@ -125,40 +138,7 @@ fi
 # Point MCP config to the memory server
 sed -i "s|http://localhost:8080/mcp|${BOT_MEMORY_URL}|" .mcp.json
 
-# Configure gh CLI auth (HTTPS + credential helper for git)
-mkdir -p ~/.config/gh
-cat > ~/.config/gh/hosts.yml <<EOF
-github.com:
-    oauth_token: ${GH_TOKEN}
-    user: ${GH_USERNAME}
-    git_protocol: https
-EOF
-gh auth setup-git 2>/dev/null || true
-
-# Remove token from env — gh uses the config file from now on
-unset GH_TOKEN
-
-# Configure glab CLI auth (GitLab)
-if [ -n "${GITLAB_TOKEN:-}" ]; then
-    mkdir -p ~/.config/glab-cli
-    cat > ~/.config/glab-cli/config.yml <<EOF
-git_protocol: https
-check_update: false
-no_prompt: true
-host: gitlab.cee.redhat.com
-hosts:
-    gitlab.cee.redhat.com:
-        token: ${GITLAB_TOKEN}
-        api_protocol: https
-        api_host: gitlab.cee.redhat.com
-        git_protocol: https
-        skip_tls_verify: true
-EOF
-    chmod 600 ~/.config/glab-cli/config.yml
-    unset GITLAB_TOKEN
-fi
-
-# --- Verify auth ---
+# --- Verify auth (via thin client → proxy) ---
 echo "Verifying GitHub auth..."
 gh auth status 2>&1 | head -3 || { echo "WARNING: gh auth failed"; }
 echo "Verifying GitLab auth..."

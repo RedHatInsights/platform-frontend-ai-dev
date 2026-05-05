@@ -41,6 +41,16 @@ services:
   proxy:
     build:
       context: ./proxy
+    env_file:
+      - .env
+    environment:
+      - GH_TOKEN
+      - GITLAB_TOKEN
+      - GH_USERNAME
+      - GL_USERNAME
+      - GPG_PRIVATE_KEY_B64
+    volumes:
+      - executor-sock:/var/run/devbot
     healthcheck:
       test: ["CMD-SHELL", "squidclient -h 127.0.0.1 -p 3128 mgr:info > /dev/null 2>&1 || exit 1"]
       interval: 5s
@@ -64,16 +74,13 @@ services:
     pids_limit: 500
     env_file:
       - .env
+    volumes:
+      - executor-sock:/var/run/devbot
     environment:
-      - GPG_PRIVATE_KEY_B64
-      - GH_TOKEN
-      - GITLAB_TOKEN
       - GH_USER_NAME
       - GH_USER_EMAIL
-      - GH_USERNAME
       - GL_USER_NAME
       - GL_USER_EMAIL
-      - GL_USERNAME
       - GOOGLE_SA_KEY_B64
       - SSO_USERNAME
       - SSO_PASSWORD
@@ -111,6 +118,12 @@ volumes:
   pgdata:
     name: memory-server_pgdata
     external: true
+  executor-sock:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=1m
 
 networks:
   internal:

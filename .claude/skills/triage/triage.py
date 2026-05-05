@@ -350,7 +350,7 @@ def main():
 
     enriched = [enrich(t) for t in active]
 
-    merged, ci_fail, conflict, feedback, interrupted, clean = [], [], [], [], [], []
+    merged, closed, ci_fail, conflict, feedback, interrupted, clean = [], [], [], [], [], [], []
 
     for e in enriched:
         issues = e["issues"]
@@ -359,6 +359,8 @@ def main():
 
         if "merged" in issues:
             merged.append(e)
+        elif "closed" in issues:
+            closed.append(e)
         elif any(i.startswith("ci_fail") for i in issues):
             ci_fail.append(e)
         elif "conflict" in issues:
@@ -377,6 +379,12 @@ def main():
     if merged:
         print(f"== MERGED ({len(merged)}) — archive + transition ==")
         for e in merged:
+            print(fmt_task(e))
+            print()
+
+    if closed:
+        print(f"== CLOSED ({len(closed)}) — PR closed without merge, investigate + archive or reopen ==")
+        for e in closed:
             print(fmt_task(e))
             print()
 
@@ -416,7 +424,7 @@ def main():
     if done:
         print(f"DONE (archive?): {','.join(t.get('jira_key','?') for t in done)}")
 
-    total = len(merged) + len(ci_fail) + len(conflict) + len(feedback) + len(interrupted)
+    total = len(merged) + len(closed) + len(ci_fail) + len(conflict) + len(feedback) + len(interrupted)
     if total == 0:
         print("-> all clean -> Priority 2")
     else:

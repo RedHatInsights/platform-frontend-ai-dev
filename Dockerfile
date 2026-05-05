@@ -4,6 +4,13 @@ COPY dev-proxy/ /tmp/dev-proxy/
 RUN cd /tmp/dev-proxy \
     && go build -o /tmp/caddy .
 
+# Build executor thin client (gh/glab shim that forwards via UDS to proxy sidecar)
+FROM registry.access.redhat.com/ubi9/go-toolset:latest AS executor-client-builder
+WORKDIR /build
+COPY proxy/executor/ .
+RUN go mod download \
+    && CGO_ENABLED=0 go build -o /tmp/executor-client ./cmd/client
+
 FROM registry.access.redhat.com/ubi9/ubi:latest
 
 # System deps + Python 3.12 + Chromium runtime libraries
@@ -76,17 +83,11 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && curl -fsSL "https://github.com/golangci/golangci-lint/releases/download/v2.1.6/golangci-lint-2.1.6-linux-${ARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin --strip-components=1 --wildcards '*/golangci-lint'
 
-# gh CLI
-RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
-    && curl -fsSL "https://github.com/cli/cli/releases/download/v2.67.0/gh_2.67.0_linux_${ARCH}.tar.gz" \
-    | tar -xz -C /usr/local --strip-components=1
-
-# glab CLI — download then extract (no pipe, so curl failures are caught)
-RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
-    && curl -fSL -o /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v1.51.0/downloads/glab_1.51.0_linux_${ARCH}.tar.gz" \
-    && tar -xzf /tmp/glab.tar.gz -C /usr/local/bin --strip-components=1 bin/glab \
-    && rm /tmp/glab.tar.gz \
-    && glab version
+# Executor thin client — drop-in gh/glab replacement (forwards to proxy sidecar)
+COPY --from=executor-client-builder /tmp/executor-client /usr/local/bin/executor-client
+RUN ln /usr/local/bin/executor-client /usr/local/bin/gh \
+    && ln /usr/local/bin/executor-client /usr/local/bin/glab \
+    && ln /usr/local/bin/executor-client /usr/local/bin/gpg
 
 # bubblewrap (sandbox runtime for Claude Code)
 RUN dnf install -y --nodocs libcap-devel \
