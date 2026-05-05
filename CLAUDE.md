@@ -213,14 +213,9 @@ PR statuses are in the triage output. For each `pr_open`/`pr_changes` task:
 - Context/requirements → incorporate
 - `task_update` `last_addressed`
 
-**PR merged**:
-- `task_update` status `archived`, `summary` w/ outcome
-- `jira_transition_issue` → "Release Pending" (NOT "Done" — merge = stage only)
-- Jira comment noting merge + stage deploy
+**PR merged**: Invoke `/wrap-up` with the Jira key. The script handles: task archival, Jira transition → "Release Pending", Jira comment, Slack notification, remote + local branch deletion (tolerates already-deleted branches). After wrap-up completes:
 - **Update linked issues**: duplicates → comment fix merged. Related → link PR. Blocked → blocker resolved.
-- **Delete bot branch**: GH: `gh api repos/{owner}/{repo}/git/refs/heads/bot/{KEY} -X DELETE`. GL: `glab api projects/:id/repository/branches/bot%2F{KEY} -X DELETE --hostname gitlab.cee.redhat.com`. Local: `git branch -D bot/{KEY}`.
 - **Store learnings**: `memory_store` as `learning` + `codebase_pattern`. Set `repo` + `tags`.
-- `slack_notify` `release_pending`: "{KEY} merged → Release Pending. PR: {url}"
 
 **Unresolvable**: Jira comment explaining blocker. `task_update` `paused_reason`. `slack_notify` `needs_help`: "{KEY} blocked — {reason}". Task stays tracked.
 
@@ -229,7 +224,7 @@ Handle one PR issue → stop. Next cycle picks up next.
 ### Priority 1.5: Check Assigned Tickets
 
 Triage output covers task statuses, PR states, and Jira comments. Use it to identify:
-1. **Merged PRs?** If triage shows `state=MERGED` → transition "Release Pending", Jira comment, `task_update` archived, `memory_store`.
+1. **Merged PRs?** If triage shows `state=MERGED` → invoke `/wrap-up <KEY>`. Then `memory_store` learnings.
 2. **New Jira comments?** Visible in triage output. Handle: questions → reply, requirements → incorporate, close requests → respect.
 3. PR still open, no comments → skip (Priority 1 handles).
 
@@ -360,8 +355,10 @@ Before starting work, `jira_get_issue` → check issue links:
     GH direct: `gh pr create --title "..." --body "..."`
     Push fails → `last_step = "push_failed"`, Jira comment, keep `in_progress` for retry.
 
-    GL fork: `glab mr create --repo <upstream-path> --hostname gitlab.cee.redhat.com --title "..." --description "..."`
-    GL direct: `glab mr create --hostname gitlab.cee.redhat.com --title "..." --description "..."`
+    GL fork: `glab mr create --repo <upstream-path> --hostname gitlab.cee.redhat.com --title "..." --description "$(cat <<'EOF' ... EOF)"`
+    GL direct: `glab mr create --hostname gitlab.cee.redhat.com --title "..." --description "$(cat <<'EOF' ... EOF)"`
+
+    **CRITICAL**: glab URL-encodes newlines if description is passed inline. ALWAYS use heredoc `$(cat <<'EOF' ... EOF)` for multiline descriptions. Same pattern as `gh pr create --body`.
 
     Title ≤50 chars. Body = ticket key + changes summary.
     Readonly repos: include config changes in Jira comment.
