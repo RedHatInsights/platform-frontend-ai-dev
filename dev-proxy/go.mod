@@ -44,7 +44,7 @@ require (
 	github.com/darkweak/souin v1.7.8 // indirect
 	github.com/darkweak/storages/core v0.0.19 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
-	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
+	github.com/dgraph-io/badger/v4 v4.9.1 // indirect
 	github.com/dgraph-io/ristretto v0.2.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da // indirect
 	github.com/dlclark/regexp2 v1.12.0 // indirect
