@@ -160,6 +160,24 @@ objects:
       protocol: TCP
       name: http
 
+# --- Memory Server Route (dashboard + health) ---
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: devbot-memory-server
+    labels:
+      app.kubernetes.io/name: memory-server
+      app.kubernetes.io/part-of: devbot
+  spec:
+    to:
+      kind: Service
+      name: devbot-memory-server
+    port:
+      targetPort: http
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+
 # --- Proxy Deployment (Squid + Executor server — holds all CLI secrets) ---
 - apiVersion: apps/v1
   kind: Deployment
